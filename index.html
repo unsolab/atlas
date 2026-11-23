@@ -1,0 +1,2034 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNSO | Ecosistema Curricular Neo4j: Ciberseguridad, Trayectos y Maestrías</title>
+    <!-- Librería Vis.js Network -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --bg-panel: #111827;
+            --bg-card: #1f2937;
+            --border-color: #374151;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --unso-blue: #38bdf8;
+            --accent-cypher: #10b981;
+            
+            /* Colores de Clústeres (Nodos) */
+            --c-ciber: #ef4444;     /* Grado: Ciberseguridad, Forense y Defensa */
+            --c-dev: #3b82f6;       /* Grado: Desarrollo, Software y Datos */
+            --c-net: #10b981;       /* Grado: Redes, Sistemas e Infraestructura */
+            --c-mgmt: #a855f7;      /* Grado: Gestión, Legales, RRII y Ética */
+            --c-math: #f59e0b;      /* Grado: Bloque Ciencias Básicas */
+            --c-int: #ec4899;       /* Grado: Práctica Profesional e Integración */
+            --c-tray: #eab308;      /* Certificaciones: Trayectos Formativos T1-T5 */
+            --c-mia: #06b6d4;       /* Posgrado: Maestría en IA e Inteligencia de Procesos */
+            --c-mos: #f97316;       /* Posgrado: Maestría y Especialización en OSINT */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* HEADER ESTILO NEO4J / UNSO */
+        header {
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand-logo {
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            color: white;
+            font-weight: 800;
+            font-size: 1.2rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+        }
+
+        .brand-titles h1 {
+            font-size: 1.02rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .brand-titles p {
+            font-size: 0.75rem;
+            color: var(--unso-blue);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* BARRA DE CONSULTA CYPHER */
+        .cypher-bar {
+            background-color: #060911;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            max-width: 690px;
+            margin: 0 18px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .cypher-prompt {
+            color: var(--accent-cypher);
+            font-weight: 600;
+        }
+
+        .cypher-code {
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .kw { color: #f472b6; font-weight: 600; }
+        .lbl { color: #38bdf8; }
+        .rel { color: #fbbf24; }
+
+        /* LAYOUT PRINCIPAL */
+        .main-container {
+            display: flex;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR IZQUIERDO: CONTROLES Y FILTROS */
+        .sidebar-left {
+            width: 325px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            overflow-y: auto;
+            z-index: 5;
+        }
+
+        .panel-section {
+            background-color: rgba(31, 41, 55, 0.45);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 11px;
+        }
+
+        .section-title {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 9px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .search-box input, .select-box select {
+            width: 100%;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            outline: none;
+        }
+
+        .search-box input:focus, .select-box select:focus {
+            border-color: var(--unso-blue);
+        }
+
+        /* BOTONES DE CONTROL */
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background-color: #374151;
+            border-color: var(--unso-blue);
+        }
+
+        .btn.active {
+            background-color: #0284c7;
+            border-color: #38bdf8;
+            color: white;
+        }
+
+        /* CHECKBOXES Y LEYENDA DE ARISTAS */
+        .toggle-list {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            cursor: pointer;
+            padding: 3px 0;
+        }
+
+        .toggle-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .edge-line {
+            width: 22px;
+            height: 3px;
+            display: inline-block;
+            border-radius: 2px;
+        }
+
+        .edge-aprobada { background-color: #ef4444; }
+        .edge-regular { background-color: #f59e0b; border-top: 2px dashed #f59e0b; height: 0; }
+        .edge-trayecto { background-color: #eab308; }
+        .edge-posgrado { background-color: #10b981; border-top: 2px dashed #10b981; height: 0; }
+        .edge-afinidad { background-color: #38bdf8; border-top: 2px dotted #38bdf8; height: 0; }
+
+        /* LEYENDA DE CLÚSTERES */
+        .cluster-list {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .cluster-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.76rem;
+            padding: 5px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .cluster-item:hover {
+            background-color: rgba(255,255,255,0.06);
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .shape-hex {
+            width: 12px;
+            height: 12px;
+            background: var(--c-tray);
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            flex-shrink: 0;
+        }
+
+        .shape-diamond {
+            width: 12px;
+            height: 12px;
+            background: var(--c-mia);
+            transform: rotate(45deg);
+            flex-shrink: 0;
+        }
+
+        .shape-star {
+            width: 12px;
+            height: 12px;
+            background: var(--c-mos);
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+            flex-shrink: 0;
+        }
+
+        /* LIENZO DEL GRAFO */
+        #network-container {
+            flex: 1;
+            height: 100%;
+            background: radial-gradient(circle at center, #111827 0%, #070a10 100%);
+            position: relative;
+        }
+
+        /* OVERLAY DE ESTADÍSTICAS FLOTANTE */
+        .stats-overlay {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            display: flex;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 4;
+            flex-wrap: wrap;
+        }
+
+        .stat-pill {
+            background-color: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(6px);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.74rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-pill strong {
+            color: var(--unso-blue);
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* SIDEBAR DERECHO: INSPECTOR DE MATERIA / TRAYECTO / POSGRADO */
+        .sidebar-right {
+            width: 410px;
+            background-color: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            padding: 18px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            z-index: 5;
+        }
+
+        #inspector-content {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .node-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .node-header h2 {
+            font-size: 1.18rem;
+            line-height: 1.3;
+            color: white;
+            margin-bottom: 6px;
+        }
+
+        .node-meta {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 8px 6px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .metric-val {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--unso-blue);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .metric-lbl {
+            font-size: 0.63rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .content-box {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 11px;
+            font-size: 0.82rem;
+            line-height: 1.52;
+            color: #d1d5db;
+        }
+
+        .roles-box {
+            background: rgba(234, 179, 8, 0.1);
+            border: 1px solid rgba(234, 179, 8, 0.35);
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            color: #fef08a;
+        }
+
+        .rel-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .rel-chip {
+            background-color: var(--bg-card);
+            border-left: 3px solid var(--unso-blue);
+            padding: 7px 10px;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.15s;
+        }
+
+        .rel-chip:hover {
+            background-color: #374151;
+            transform: translateX(3px);
+        }
+
+        .rel-chip.aprobada { border-left-color: #ef4444; }
+        .rel-chip.regular { border-left-color: #f59e0b; }
+        .rel-chip.trayecto { border-left-color: #eab308; }
+        .rel-chip.posgrado { border-left-color: #10b981; }
+        .rel-chip.afinidad { border-left-color: #38bdf8; }
+
+        .rel-tag {
+            font-size: 0.65rem;
+            font-family: 'Fira Code', monospace;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background-color: rgba(0,0,0,0.35);
+            white-space: nowrap;
+        }
+
+        .director-note {
+            background: linear-gradient(145deg, rgba(2,132,199,0.15), rgba(17,24,39,0.9));
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.79rem;
+            line-height: 1.45;
+            color: #bae6fd;
+        }
+
+        /* ELEMENTOS EXCLUSIVOS PARA MÓVIL / TABLET (OCULTOS EN ESCRITORIO) */
+        .drawer-mobile-header {
+            display: none;
+        }
+
+        .mobile-fab-bar {
+            display: none;
+        }
+
+        .drawer-backdrop {
+            display: none;
+        }
+
+        /* SCROLLBAR PERSONALIZADO */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+        /* ============================================================================
+           REGLAS RESPONSIVE PARA MÓVILES Y TABLETS (< 900px)
+           ============================================================================ */
+        @media (max-width: 900px) {
+            header {
+                padding: 10px 14px;
+            }
+
+            .cypher-bar {
+                display: none !important;
+            }
+
+            .brand {
+                gap: 10px;
+            }
+
+            .brand-logo {
+                font-size: 1rem;
+                padding: 6px 10px;
+            }
+
+            .brand-titles h1 {
+                font-size: 0.88rem;
+            }
+
+            .brand-titles p {
+                display: none;
+            }
+
+            .header-actions .btn {
+                padding: 6px 8px;
+                font-size: 0.74rem;
+            }
+
+            #network-container {
+                width: 100%;
+                height: 100%;
+            }
+
+            .stats-overlay {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                gap: 6px;
+            }
+
+            .stat-pill {
+                font-size: 0.68rem;
+                padding: 4px 9px;
+            }
+
+            .sidebar-left {
+                position: absolute;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 88%;
+                max-width: 340px;
+                z-index: 30;
+                transform: translateX(-105%);
+                transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: 6px 0 25px rgba(0, 0, 0, 0.75);
+            }
+
+            .sidebar-left.drawer-open {
+                transform: translateX(0);
+            }
+
+            .sidebar-right {
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 92%;
+                max-width: 390px;
+                z-index: 30;
+                transform: translateX(105%);
+                transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: -6px 0 25px rgba(0, 0, 0, 0.75);
+                padding: 16px;
+            }
+
+            .sidebar-right.drawer-open {
+                transform: translateX(0);
+            }
+
+            .drawer-mobile-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-bottom: 12px;
+                margin-bottom: 4px;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .drawer-mobile-title {
+                font-size: 0.85rem;
+                font-weight: 700;
+                color: var(--unso-blue);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            .drawer-close-btn {
+                background-color: var(--bg-card);
+                border: 1px solid var(--border-color);
+                color: var(--text-main);
+                width: 30px;
+                height: 30px;
+                border-radius: 6px;
+                font-size: 1rem;
+                line-height: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            }
+
+            .drawer-close-btn:hover {
+                background-color: #ef4444;
+                border-color: #ef4444;
+                color: white;
+            }
+
+            .drawer-backdrop {
+                display: block;
+                position: absolute;
+                inset: 0;
+                background-color: rgba(5, 8, 16, 0.65);
+                backdrop-filter: blur(2px);
+                z-index: 25;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.25s ease;
+            }
+
+            .drawer-backdrop.active {
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            .mobile-fab-bar {
+                display: flex;
+                justify-content: space-between;
+                position: absolute;
+                bottom: 18px;
+                left: 16px;
+                right: 16px;
+                pointer-events: none;
+                z-index: 20;
+            }
+
+            .fab-btn {
+                pointer-events: auto;
+                background: linear-gradient(135deg, #1e293b, #0f172a);
+                border: 1px solid var(--unso-blue);
+                color: var(--text-main);
+                padding: 10px 16px;
+                border-radius: 24px;
+                font-size: 0.82rem;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), 0 0 10px rgba(56, 189, 248, 0.25);
+                cursor: pointer;
+                transition: transform 0.15s, background 0.2s;
+            }
+
+            .fab-btn:active {
+                transform: scale(0.96);
+            }
+
+            .fab-btn.active {
+                background: linear-gradient(135deg, #0284c7, #0369a1);
+                color: white;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CABECERA -->
+    <header>
+        <div class="brand">
+            <div class="brand-logo">UNSO</div>
+            <div class="brand-titles">
+                <h1>Ecosistema Ciberseguridad, Trayectos y Posgrados</h1>
+                <p>Tecnicatura • Licenciatura • 5 Trayectos (T1-T5) • Maestría IA • Maestría OSINT</p>
+            </div>
+        </div>
+
+        <div class="cypher-bar" title="Consulta Cypher activa sobre el grafo curricular completo">
+            <span class="cypher-prompt">neo4j$</span>
+            <div class="cypher-code" id="cypher-display">
+                <span class="kw">MATCH</span> (n:<span class="lbl">Grado|Trayecto|Posgrado</span>)-[r]-&gt;(m) <span class="kw">RETURN</span> n, r, m;
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn" onclick="resetCamera()">Centrar Grafo</button>
+            <button class="btn" onclick="clearSelection()">Ver Todo</button>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div class="main-container">
+
+        <!-- BACKDROP PARA MÓVILES -->
+        <div class="drawer-backdrop" id="drawer-backdrop" onclick="closeAllDrawers(true)"></div>
+
+        <!-- PANEL IZQUIERDO: FILTROS Y CONTROLES -->
+        <aside class="sidebar-left" id="sidebar-left">
+            <div class="drawer-mobile-header">
+                <span class="drawer-mobile-title">⚙ Filtros y Controles</span>
+                <button class="drawer-close-btn" onclick="toggleDrawer('left')" title="Cerrar Filtros">✕</button>
+            </div>
+            
+            <div class="panel-section">
+                <div class="section-title">Búsqueda Rápida</div>
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Nombre, código (00310, T1, MIA, MOS) o tema..." oninput="filterNodes()">
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="section-title">Disposición del Grafo (Layout)</div>
+                <div class="btn-group">
+                    <button class="btn active" id="btn-force" onclick="setLayout('force')">Red Neo4j</button>
+                    <button class="btn" id="btn-hier" onclick="setLayout('hierarchical')">Cronológico</button>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="section-title">Filtro por Carrera / Trayecto / Nivel</div>
+                <div class="select-box">
+                    <select id="cycle-filter" onchange="filterNodes()">
+                        <option value="ALL">🌐 Ecosistema Completo UNSO (61 Nodos)</option>
+                        <optgroup label="Grado y Pregrado (Licenciatura / Tecnicatura)">
+                            <option value="GRADO_TRAY">Licenciatura + 5 Trayectos Formativos</option>
+                            <option value="GRADO_ONLY">Solo Asignaturas de Grado (1° a 4° Año - 240 Cr.)</option>
+                            <option value="TEC">Tecnicatura Universitaria (1° a 3° Año - 180 Cr.)</option>
+                            <option value="LIC_NUCLEO">4° Año: Ciclo Licenciatura + Núcleo Superior</option>
+                        </optgroup>
+                        <optgroup label="Programa de Trayectos Formativos (Certificaciones)">
+                            <option value="TRAY_ALL">🏅 Todos los Trayectos (T1 a T5) y sus Materias</option>
+                            <option value="T1_VIEW">T1: Sistemas Seguros, Accesos y Normativa (Mes 18)</option>
+                            <option value="T2_VIEW">T2: Desarrollo de Software, Análisis y BD (Mes 24)</option>
+                            <option value="T3_VIEW">T3: Redes, Criptografía y UNIX/Linux (Mes 36)</option>
+                            <option value="T4_VIEW">T4: Análisis Forense e Inv. Ciberdelitos (Mes 36)</option>
+                            <option value="T5_VIEW">T5: Operaciones Ofensivas, Incidentes y CTI (Mes 48)</option>
+                        </optgroup>
+                        <optgroup label="Carreras de Posgrado (Maestrías y Especialización)">
+                            <option value="POSGRADO_ALL">🎓 Ambos Posgrados (Maestría IA + Maestría OSINT)</option>
+                            <option value="MIA_VIEW">🤖 Maestría en IA e Inteligencia de Procesos (120 CRE)</option>
+                            <option value="MOS_VIEW">🕵️ Maestría en OSINT y Análisis Digital (120 CRE)</option>
+                            <option value="ESP_OSINT_VIEW">🔍 Título Intermedio: Especialización en OSINT (60 CRE)</option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="section-title">Relaciones (Aristas Cypher)</div>
+                <div class="toggle-list">
+                    <label class="toggle-item">
+                        <span class="toggle-left">
+                            <span class="edge-line edge-aprobada"></span>
+                            <span>[:REQ_APROBADA] (Final)</span>
+                        </span>
+                        <input type="checkbox" id="chk-aprobada" checked onchange="updateEdgesVisibility()">
+                    </label>
+                    <label class="toggle-item">
+                        <span class="toggle-left">
+                            <span class="edge-line edge-regular"></span>
+                            <span>[:REQ_REGULAR] (Cursada)</span>
+                        </span>
+                        <input type="checkbox" id="chk-regular" checked onchange="updateEdgesVisibility()">
+                    </label>
+                    <label class="toggle-item">
+                        <span class="toggle-left">
+                            <span class="edge-line edge-trayecto"></span>
+                            <span>[:INTEGRA_TRAYECTO] (T1–T5)</span>
+                        </span>
+                        <input type="checkbox" id="chk-trayecto" checked onchange="updateEdgesVisibility()">
+                    </label>
+                    <label class="toggle-item">
+                        <span class="toggle-left">
+                            <span class="edge-line edge-posgrado"></span>
+                            <span>[:ARTICULA_POSGRADO]</span>
+                        </span>
+                        <input type="checkbox" id="chk-posgrado" checked onchange="updateEdgesVisibility()">
+                    </label>
+                    <label class="toggle-item">
+                        <span class="toggle-left">
+                            <span class="edge-line edge-afinidad"></span>
+                            <span>[:AFINIDAD_TEMATICA]</span>
+                        </span>
+                        <input type="checkbox" id="chk-afinidad" checked onchange="updateEdgesVisibility()">
+                    </label>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="section-title">
+                    <span>Nodos y Ejes del Ecosistema</span>
+                    <span style="font-size:0.68rem; color:var(--unso-blue); cursor:pointer;" onclick="setClusterFilter('ALL')">[Todos]</span>
+                </div>
+                <div class="cluster-list">
+                    <div class="cluster-item" onclick="setClusterFilter('TRAY')">
+                        <span class="shape-hex"></span>
+                        <span><strong>Certificaciones:</strong> Trayectos T1 a T5</span>
+                    </div>
+                    <div class="cluster-item" onclick="setClusterFilter('MIA')">
+                        <span class="shape-diamond"></span>
+                        <span><strong>Posgrado:</strong> Maestría en IA y Procesos</span>
+                    </div>
+                    <div class="cluster-item" onclick="setClusterFilter('MOS')">
+                        <span class="shape-star"></span>
+                        <span><strong>Posgrado:</strong> Maestría / Esp. en OSINT</span>
+                    </div>
+                    <div class="cluster-item" onclick="setClusterFilter('CIBER')">
+                        <span class="dot" style="background: var(--c-ciber);"></span>
+                        <span>Grado: Ciberseguridad, Defensa y Forense</span>
+                    </div>
+                    <div class="cluster-item" onclick="setClusterFilter('DEV')">
+                        <span class="dot" style="background: var(--c-dev);"></span>
+                        <span>Grado: Desarrollo de Software y Datos</span>
+                    </div>
+                    <div class="cluster-item" onclick="setClusterFilter('NET')">
+                        <span class="dot" style="background: var(--c-net);"></span>
+                        <span>Grado: Redes, Sistemas y UNIX/Linux</span>
+                    </div>
+                    <div class="cluster-item" onclick="setClusterFilter('MGMT')">
+                        <span class="dot" style="background: var(--c-mgmt);"></span>
+                        <span>Grado: Gestión, Legales y Núcleo Lic.</span>
+                    </div>
+                    <div class="cluster-item" onclick="setClusterFilter('MATH')">
+                        <span class="dot" style="background: var(--c-math);"></span>
+                        <span>Grado: Bloque Ciencias Básicas</span>
+                    </div>
+                    <div class="cluster-item" onclick="setClusterFilter('INT')">
+                        <span class="dot" style="background: var(--c-int);"></span>
+                        <span>Grado: PPS e Integración Final (PFI)</span>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- LIENZO CENTRAL VIS.JS -->
+        <main id="network-container">
+            <div class="stats-overlay">
+                <div class="stat-pill">Nodos Visibles: <strong id="stat-nodes">61</strong></div>
+                <div class="stat-pill">Relaciones Activas: <strong id="stat-edges">0</strong></div>
+                <div class="stat-pill">Créditos SACAU (Módulos): <strong id="stat-hours">480 Cr. (12.000 hs)</strong></div>
+            </div>
+        </main>
+
+        <!-- BOTONES FLOTANTES MÓVILES (ESQUINAS INFERIORES) -->
+        <div class="mobile-fab-bar">
+            <button class="fab-btn" id="fab-left" onclick="toggleDrawer('left')">
+                <span>⚙</span> <span>Filtros</span>
+            </button>
+            <button class="fab-btn" id="fab-right" onclick="toggleDrawer('right')">
+                <span>📋</span> <span>Detalles</span>
+            </button>
+        </div>
+
+        <!-- PANEL DERECHO: INSPECTOR DE MATERIA -->
+        <aside class="sidebar-right" id="inspector-panel">
+            <div class="drawer-mobile-header">
+                <span class="drawer-mobile-title">📋 Detalle Académico</span>
+                <button class="drawer-close-btn" onclick="toggleDrawer('right')" title="Cerrar Detalles">✕</button>
+            </div>
+            <!-- Se llena dinámicamente al seleccionar un nodo -->
+            <div id="inspector-content"></div>
+        </aside>
+
+    </div>
+
+    <script>
+        // ============================================================================
+        // 1. METADATOS DE CLÚSTERES Y TIPOS DE NODOS
+        // ============================================================================
+        const CLUSTER_META = {
+            CIBER: { name: "Grado • Ciberseguridad, Defensa y Forense", color: "#ef4444", bg: "rgba(239,68,68,0.18)" },
+            DEV:   { name: "Grado • Desarrollo de Software y Datos", color: "#3b82f6", bg: "rgba(59,130,246,0.18)" },
+            NET:   { name: "Grado • Redes, Sistemas e Infraestructura", color: "#10b981", bg: "rgba(16,185,129,0.18)" },
+            MGMT:  { name: "Grado • Gestión, Legales, Ética y RRII", color: "#a855f7", bg: "rgba(168,85,247,0.18)" },
+            MATH:  { name: "Grado • Bloque de Ciencias Básicas", color: "#f59e0b", bg: "rgba(245,158,11,0.18)" },
+            INT:   { name: "Grado • Práctica Profesional e Integración", color: "#ec4899", bg: "rgba(236,72,153,0.18)" },
+            TRAY:  { name: "Certificación Institucional • Trayecto Formativo", color: "#eab308", bg: "rgba(234,179,8,0.22)" },
+            MIA:   { name: "Posgrado • Maestría en IA e Inteligencia de Procesos", color: "#06b6d4", bg: "rgba(6,182,212,0.22)" },
+            MOS:   { name: "Posgrado • Maestría en OSINT y Análisis Digital", color: "#f97316", bg: "rgba(249,115,22,0.22)" }
+        };
+
+        // ============================================================================
+        // 2. BASE DE DATOS UNIFICADA (28 GRADO + 5 TRAYECTOS + 14 MAESTRÍA IA + 14 MAESTRÍA OSINT)
+        // ============================================================================
+        const rawSubjects = [
+            // ------------------------------------------------------------------------
+            // A. ASIGNATURAS DE GRADO (LICENCIATURA / TECNICATURA EN CIBERSEGURIDAD)
+            // ------------------------------------------------------------------------
+            {
+                id: "00302", label: "Intro. al Desarrollo\nde Sistemas", fullName: "Introducción al Desarrollo de Sistemas",
+                nodeType: "GRADO", year: 1, term: 1, level: 1, hip: 64, hta: 186, total: 250, credits: 10, cluster: "DEV", degree: "TEC",
+                trayecto: "T2", curricularBlock: "Trayecto Formativo T2 — Desarrollo, Análisis y BD",
+                contents: "Sistemas. Concepto. Tipos de sistemas de información. Desarrollo de sistemas. Administración de sistemas de bases de datos. Diagramas de flujo, datos, procesos, lógica. SQL/QBE."
+            },
+            {
+                id: "00303", label: "Fundamentos del\nCibercrimen", fullName: "Fundamentos del Cibercrimen",
+                nodeType: "GRADO", year: 1, term: 1, level: 1, hip: 64, hta: 186, total: 250, credits: 10, cluster: "MGMT", degree: "TEC",
+                trayecto: "T1", trayectoArticulado: "T4", curricularBlock: "Trayecto T1 (y base de articulación para Trayecto T4)",
+                contents: "Introducción al cibercrimen. Clases de delitos. Legislación vigente. El Derecho, las tecnologías digitales e Internet. Cibercrimen y ciberseguridad."
+            },
+            {
+                id: "00304", label: "Conceptos de\nDes. de Software", fullName: "Conceptos de Desarrollo de Software",
+                nodeType: "GRADO", year: 1, term: 1, level: 1, hip: 64, hta: 186, total: 250, credits: 10, cluster: "DEV", degree: "TEC",
+                trayecto: "T2", curricularBlock: "Trayecto Formativo T2 — Desarrollo, Análisis y BD",
+                contents: "Desarrollo de software y conceptos comunes al lenguaje de programación. Desarrollo de algoritmos. Solución de problemas. Debug, standards de programación, variables, tipos de datos, operadores, decisores. Estructuras de repetición, matriz. Construcción de interfaces."
+            },
+            {
+                id: "00075", label: "Fundamentos de\nMatemática", fullName: "Fundamentos de Matemática",
+                nodeType: "GRADO", year: 1, term: 2, level: 2, hip: 64, hta: 186, total: 250, credits: 10, cluster: "MATH", degree: "TEC",
+                trayecto: "BASICAS", curricularBlock: "Bloque de Ciencias Básicas (Infraestructura Científico-Formal)",
+                contents: "Álgebra vectorial, suma de vectores, producto vectorial, producto escalar de vectores, diferencia entre vectores, determinantes, sistemas de ecuaciones lineales, métodos de reducción, polinomios, ecuaciones de segundo grado, cálculo combinatorio, variaciones, permutaciones, combinaciones."
+            },
+            {
+                id: "00305", label: "Arquitectura de\nTecnologías Inf.", fullName: "Arquitectura de Tecnologías Informáticas",
+                nodeType: "GRADO", year: 1, term: 2, level: 2, hip: 64, hta: 186, total: 250, credits: 10, cluster: "NET", degree: "TEC",
+                trayecto: "T1", curricularBlock: "Trayecto Formativo T1 — Sistemas Seguros y Accesos",
+                contents: "Arquitecturas de sistemas operativos. Redes a partir de sistemas operativos. Arquitecturas de sistemas distribuidos. Tecnologías actuales y tendencias."
+            },
+            {
+                id: "00306", label: "Fund. Ciberseguridad\ne Infra. Críticas", fullName: "Fundamentos de Ciberseguridad y Protección de Infraestructuras Críticas",
+                nodeType: "GRADO", year: 1, term: 2, level: 2, hip: 64, hta: 186, total: 250, credits: 10, cluster: "CIBER", degree: "TEC",
+                trayecto: "T1", curricularBlock: "Trayecto Formativo T1 — Sistemas Seguros y Accesos",
+                contents: "Historia, Desarrollo y evolución. Modelos de seguridad y soluciones de seguridad. Riesgos y vulnerabilidades. Controles técnicos y mitigación de riesgos. Políticas de seguridad. Marcos de administración de incidentes. La Protección de las Infraestructuras Críticas: concepto, evolución, casos y normativa."
+            },
+            {
+                id: "00307", label: "Programación\nOrientada a Objetos", fullName: "Programación orientada a Objetos",
+                nodeType: "GRADO", year: 2, term: 1, level: 3, hip: 64, hta: 186, total: 250, credits: 10, cluster: "DEV", degree: "TEC",
+                trayecto: "T2", curricularBlock: "Trayecto Formativo T2 — Desarrollo, Análisis y BD",
+                contents: "Tipos de datos. Decisiones, estructuras de repetición. Métodos. Matrices y colecciones. Polimorfismo. Manejo de excepciones. Persistencia. Conectividad y DBMS. Interfaces. Testeo de software y debug."
+            },
+            {
+                id: "00308", label: "Cálculo\nAplicado", fullName: "Cálculo Aplicado",
+                nodeType: "GRADO", year: 2, term: 1, level: 3, hip: 64, hta: 186, total: 250, credits: 10, cluster: "MATH", degree: "TEC",
+                trayecto: "BASICAS", curricularBlock: "Bloque de Ciencias Básicas (Infraestructura Científico-Formal)",
+                contents: "Funciones trigonométricas y exponenciales. Límites y diferenciación. Máxima, mínima y optimización. Modelado de curvas. Integrales, derivadas. Métodos numéricos. Técnicas de integración. Ecuaciones diferenciadas. Matrices, determinantes, Vectores y valores."
+            },
+            {
+                id: "00310", label: "Gestión Integral de\nla Ciberseguridad", fullName: "Gestión Integral de la Ciberseguridad",
+                nodeType: "GRADO", year: 2, term: 1, level: 3, hip: 64, hta: 186, total: 250, credits: 10, cluster: "MGMT", degree: "TEC",
+                trayecto: "T1", curricularBlock: "Trayecto Formativo T1 — Cierre Hito Mes 18 (40 créditos)",
+                contents: "Autenticación y autorización en sistemas. Directorio de servicios. Administración y seguridad de sistemas. Políticas y regulación de TI. Dinámicas sociales y culturales de la globalización. Ética aplicada a la tecnología. Protección de datos personales en la era digital. Privacidad y seguridad."
+            },
+            {
+                id: "00311", label: "Base de\nDatos", fullName: "Base de Datos",
+                nodeType: "GRADO", year: 2, term: 2, level: 4, hip: 64, hta: 186, total: 250, credits: 10, cluster: "DEV", degree: "TEC",
+                trayecto: "T2", curricularBlock: "Trayecto Formativo T2 — Desarrollo, Análisis y BD",
+                contents: "SQL. Programación de Bases de datos."
+            },
+            {
+                id: "00312", label: "Sist. de Análisis y\nMétodos de Diseño", fullName: "Sistemas de Análisis y Métodos de Diseño",
+                nodeType: "GRADO", year: 2, term: 2, level: 4, hip: 64, hta: 186, total: 250, credits: 10, cluster: "DEV", degree: "TEC",
+                trayecto: "T2", curricularBlock: "Trayecto Formativo T2 — Cierre Hito Mes 24 (50 créditos)",
+                contents: "Análisis de sistemas, desarrollo de tecnologías. Planificación de sistemas. Administración de proyectos. Diseño de sistemas e implementación. Soporte. Herramientas y técnicas para el desarrollo de sistemas."
+            },
+            {
+                id: "00313", label: "Ciberdefensa", fullName: "Ciberdefensa",
+                nodeType: "GRADO", year: 2, term: 2, level: 4, hip: 64, hta: 186, total: 250, credits: 10, cluster: "CIBER", degree: "TEC",
+                trayecto: "T4", curricularBlock: "Trayecto Formativo T4 — Forense e Investigación de Ciberdelitos",
+                contents: "Evolución de la Ciberdefensa. Ciberguerra. Ciberterrorismo. Mejores Prácticas en Ciberdefensa. Principal normativa nacional e internacional. Ciberguerra y el derecho internacional humanitario. Manual de Tallin. Ciberoperaciones."
+            },
+            {
+                id: "00314", label: "Criptografía", fullName: "Criptografía",
+                nodeType: "GRADO", year: 3, term: 1, level: 5, hip: 64, hta: 186, total: 250, credits: 10, cluster: "CIBER", degree: "TEC",
+                trayecto: "T3", curricularBlock: "Trayecto Formativo T3 — Redes, Criptografía y UNIX/Linux",
+                contents: "Algoritmos y criptografía. Protocolos y técnicas. Aplicación."
+            },
+            {
+                id: "00315", label: "Administración\nde Redes", fullName: "Administración de Redes",
+                nodeType: "GRADO", year: 3, term: 1, level: 5, hip: 64, hta: 186, total: 250, credits: 10, cluster: "NET", degree: "TEC",
+                trayecto: "T3", curricularBlock: "Trayecto Formativo T3 — Redes, Criptografía y UNIX/Linux",
+                contents: "Conceptos de instalación y administración de sistemas informáticos distribuidos. Administración de sistemas operativos de redes. Infraestructura de redes."
+            },
+            {
+                id: "00316", label: "Cibercrimen y\nAnálisis Forense", fullName: "Cibercrimen y Análisis Forense",
+                nodeType: "GRADO", year: 3, term: 1, level: 5, hip: 64, hta: 186, total: 250, credits: 10, cluster: "CIBER", degree: "TEC",
+                trayecto: "T4", curricularBlock: "Trayecto Formativo T4 — Forense e Investigación de Ciberdelitos",
+                contents: "Análisis forense. Hardware, Software. Técnica y Método. Peritaje, normativa, implicancias y técnicas."
+            },
+            {
+                id: "00317", label: "Inv. Criminal de\nDelitos Informáticos", fullName: "Investigación Criminal de Delitos Informáticos",
+                nodeType: "GRADO", year: 3, term: 2, level: 6, hip: 64, hta: 186, total: 250, credits: 10, cluster: "CIBER", degree: "TEC",
+                trayecto: "T4", curricularBlock: "Trayecto Formativo T4 — Cierre Hito Mes 36 (30/40 créditos)",
+                contents: "Metodología de la investigación criminal. Delitos. Delitos informáticos. Convención Budapest, normativa nacional y normativa internacional."
+            },
+            {
+                id: "00318", label: "Programación\nde Sistemas", fullName: "Programación de Sistemas",
+                nodeType: "GRADO", year: 3, term: 2, level: 6, hip: 64, hta: 186, total: 250, credits: 10, cluster: "NET", degree: "TEC",
+                trayecto: "T3", curricularBlock: "Trayecto Formativo T3 — Redes, Criptografía y UNIX/Linux",
+                contents: "Conceptos de programación en C/C++ en UNIX/Linux. Desarrollo, algoritmos, estructuras de datos. Análisis."
+            },
+            {
+                id: "00319", label: "Ingeniería\nde Redes", fullName: "Ingeniería de Redes",
+                nodeType: "GRADO", year: 3, term: 2, level: 6, hip: 64, hta: 186, total: 250, credits: 10, cluster: "NET", degree: "TEC",
+                trayecto: "T3", curricularBlock: "Trayecto Formativo T3 — Cierre Hito Mes 36 (40 créditos)",
+                contents: "Diseño, implementación y administración de ambientes. Direccionamiento de redes. Hardware y software de redes Wireless y cableadas."
+            },
+            {
+                id: "00513", label: "Adm. y Respuesta\na Incidentes", fullName: "Administración y respuesta a Incidentes",
+                nodeType: "GRADO", year: 4, term: 1, level: 7, hip: 64, hta: 86, total: 150, credits: 6, cluster: "CIBER", degree: "LIC",
+                trayecto: "T5", curricularBlock: "Trayecto Formativo T5 — Operaciones Ofensivas, Incidentes y CTI",
+                contents: "Gestión del riesgo en ciberseguridad. Operaciones y respuesta a incidentes. Resiliencia y continuidad de los procesos organizacionales/empresariales. Protección y restablecimiento de infraestructura."
+            },
+            {
+                id: "00511", label: "Taller:\nHacking Ético", fullName: "Taller: Hacking Ético",
+                nodeType: "GRADO", year: 4, term: 1, level: 7, hip: 96, hta: 154, total: 250, credits: 10, cluster: "CIBER", degree: "LIC",
+                trayecto: "T5", curricularBlock: "Trayecto Formativo T5 — Operaciones Ofensivas, Incidentes y CTI",
+                contents: "Qué es el Hacking ético. Identificación y Explotación de vulnerabilidades en sistemas, aplicaciones web, redes y servidores."
+            },
+            {
+                id: "00119", label: "Comunicación\nEstratégica", fullName: "Comunicación Estratégica",
+                nodeType: "GRADO", year: 4, term: 1, level: 7, hip: 64, hta: 36, total: 100, credits: 4, cluster: "MGMT", degree: "LIC",
+                trayecto: "NUCLEO_LIC", curricularBlock: "Núcleo Propio de Formación Superior (Licenciatura)",
+                contents: "Modelos de Comunicación Institucional. Estrategias de Gestión del riesgo y de contextos de crisis y conflicto. Planes para la respuesta estratégica. Motivación, liderazgo y coach."
+            },
+            {
+                id: "00512", label: "Liderazgo de Equipos\ny RRHH", fullName: "Liderazgo de equipos de trabajo y Recursos Humanos",
+                nodeType: "GRADO", year: 4, term: 1, level: 7, hip: 64, hta: 36, total: 100, credits: 4, cluster: "MGMT", degree: "LIC",
+                trayecto: "NUCLEO_LIC", curricularBlock: "Núcleo Propio de Formación Superior (Licenciatura)",
+                contents: "Liderazgo. Tipos de Organizaciones. Planificación, organización del trabajo, gestión del empleo y del desempeño. Gestión de relaciones sociales y humanas. Indicadores en RRHH."
+            },
+            {
+                id: "00320", label: "Práctica Profesional\nSupervisada (PPS)", fullName: "Práctica Profesional Supervisada",
+                nodeType: "GRADO", year: 4, term: 1, level: 7, hip: 140, hta: 10, total: 150, credits: 6, cluster: "INT", degree: "LIC",
+                trayecto: "T5_CAMPO", trayectoArticulado: "T5", curricularBlock: "Espacio de Validación en Campo (Articula con Trayecto T5: 28 cr.)",
+                contents: "Participación supervisada en espacios de inserción gradual al rol profesional en instituciones públicas y privadas con convenio vigente, integrando en campo los conocimientos de ciberseguridad."
+            },
+            {
+                id: "00514", label: "Fraude y Protección\nde Datos Personales", fullName: "Fraude y protección de Datos Personales",
+                nodeType: "GRADO", year: 4, term: 2, level: 8, hip: 64, hta: 36, total: 100, credits: 4, cluster: "MGMT", degree: "LIC",
+                trayecto: "NUCLEO_LIC", curricularBlock: "Núcleo Propio de Formación Superior (Licenciatura)",
+                contents: "Tipificación de fraudes. Modelos de prevención de fraude. Medidas de protección de los datos personales. Normativas y organismos de aplicación. Compliance."
+            },
+            {
+                id: "00515", label: "Deontología\nProfesional", fullName: "Deontología Profesional",
+                nodeType: "GRADO", year: 4, term: 2, level: 8, hip: 64, hta: 36, total: 100, credits: 4, cluster: "MGMT", degree: "LIC",
+                trayecto: "NUCLEO_LIC", curricularBlock: "Núcleo Propio de Formación Superior (Licenciatura)",
+                contents: "Problemática actual de los profesionales del sector de ciberseguridad. Ética y toma de decisiones en organizaciones públicas y privadas. Regulaciones de la profesión e interés público."
+            },
+            {
+                id: "00516", label: "Ciberinteligencia", fullName: "Ciberinteligencia",
+                nodeType: "GRADO", year: 4, term: 2, level: 8, hip: 96, hta: 54, total: 150, credits: 6, cluster: "CIBER", degree: "LIC",
+                trayecto: "T5", curricularBlock: "Trayecto Formativo T5 — Cierre Hito Mes 48 (22/28 créditos)",
+                contents: "Ciclo de la Inteligencia. Ingeniería Social. OSINT. HUMINT. SIGINT. MASINT. Inteligencia financiera. Ingeniería Inversa."
+            },
+            {
+                id: "00517", label: "Diplomacia y RRII\nen Ciberseguridad", fullName: "Diplomacia y Relaciones Internacionales en ciberseguridad",
+                nodeType: "GRADO", year: 4, term: 2, level: 8, hip: 64, hta: 36, total: 100, credits: 4, cluster: "MGMT", degree: "LIC",
+                trayecto: "NUCLEO_LIC", curricularBlock: "Núcleo Propio de Formación Superior (Licenciatura)",
+                contents: "Teorías de las relaciones internacionales. Principales actores globales. Alianzas estratégicas y comercio internacional. Integración económica y rol de la seguridad de la información. Escenarios de conflicto."
+            },
+            {
+                id: "00518", label: "Proyecto Final\nIntegrador (PFI)", fullName: "Proyecto / Trabajo Final Integrador",
+                nodeType: "GRADO", year: 4, term: 2, level: 8, hip: 200, hta: 100, total: 300, credits: 12, cluster: "INT", degree: "LIC",
+                trayecto: "NUCLEO_LIC", curricularBlock: "Integración de Grado — Núcleo Propio Licenciatura",
+                contents: "Actividad formativa integradora de todos los conocimientos de la Licenciatura: 1) Desarrollo de un plan de ciberseguridad integral para una organización pública/privada, o 2) Creación de una nueva empresa del sector."
+            },
+
+            // ------------------------------------------------------------------------
+            // B. TRAYECTOS FORMATIVOS DE APTITUD LABORAL (T1 A T5 - ANEXO UNSO)
+            // ------------------------------------------------------------------------
+            {
+                id: "T1", label: "🏅 TRAYECTO T1\nSistemas Seguros\ny Accesos (Mes 18)",
+                fullName: "Trayecto Formativo T1: Operación de Sistemas Seguros, Gestión de Accesos y Normativa Base",
+                nodeType: "TRAYECTO", year: 2, term: 1, level: 3, hip: 256, hta: 744, total: 1000, credits: 40, cluster: "TRAY", degree: "CERT",
+                certificateName: "Operador/a Universitario/a en Sistemas Seguros, Gestión de Accesos y Normativa de Ciberseguridad",
+                horizon: "Mes 18 — Inserción Laboral Temprana (1°A + 2°A 1°C)",
+                roles: "Asistente de Seguridad Informática; Operador de Gestión de Identidades y Accesos (IAM); Técnico de Soporte de Infraestructura Segura (Nivel 2); Auxiliar de Seguridad en Organismos Públicos y Empresas (NICE / ENISA ECSF).",
+                contents: "Certifica aptitudes para: 1) Administrar cuentas, roles, privilegios, autenticación, autorización y directorios bajo mínimo privilegio. 2) Asistir en la operación segura de SO y servicios distribuidos. 3) Implementar políticas de seguridad, privacidad y protección de datos personales. 4) Participar en la primera línea de registro y escalamiento de incidentes en infraestructuras críticas."
+            },
+            {
+                id: "T2", label: "🏅 TRAYECTO T2\nDesarrollo, Análisis\ny BD (Mes 24)",
+                fullName: "Trayecto Formativo T2: Desarrollo de Software, Análisis de Sistemas y Bases de Datos",
+                nodeType: "TRAYECTO", year: 2, term: 2, level: 4, hip: 320, hta: 930, total: 1250, credits: 50, cluster: "TRAY", degree: "CERT",
+                certificateName: "Auxiliar Universitario/a en Desarrollo de Software, Análisis de Sistemas y Administración de Bases de Datos",
+                horizon: "Mes 24 — Inserción Laboral Temprana (1°A 1°C + 2°A)",
+                roles: "Desarrollador de Software Junior (POO / Backend); Auxiliar de Administración y Programación de Bases de Datos (SQL); Analista Funcional / Técnico Junior; Asistente de Calidad y Testeo de Software (QA) (NICE / ENISA ECSF).",
+                contents: "Certifica aptitudes para: 1) Desarrollar, depurar y testear módulos de software orientado a objetos con manejo controlado de excepciones. 2) Diseñar, consultar y programar bases de datos relacionales en SQL garantizando integridad y persistencia. 3) Relevar requerimientos, elaborar diagramas de procesos y datos, y asistir en documentación e implementación."
+            },
+            {
+                id: "T3", label: "🏅 TRAYECTO T3\nRedes, Cripto y\nUNIX/Linux (Mes 36)",
+                fullName: "Trayecto Formativo T3: Infraestructura de Redes, Criptografía y Programación de Sistemas UNIX/Linux",
+                nodeType: "TRAYECTO", year: 3, term: 2, level: 6, hip: 256, hta: 744, total: 1000, credits: 40, cluster: "TRAY", degree: "CERT",
+                certificateName: "Operador/a Técnico/a Universitario/a en Infraestructura de Redes Seguras, Criptografía y Sistemas UNIX/Linux",
+                horizon: "Mes 36 — Especialización Técnica Intermedia (3° Año)",
+                roles: "Administrador de Redes y Seguridad (NetSec); Administrador de Sistemas UNIX/Linux (SysAdmin); Especialista Técnico en Infraestructura Segura; Analista Técnico de Comunicaciones y Criptografía Aplicada (NICE / ENISA ECSF).",
+                contents: "Certifica aptitudes para: 1) Diseñar, configurar, segmentar y administrar redes cableadas e inalámbricas y sistemas distribuidos. 2) Implementar y auditar controles, algoritmos y protocolos criptográficos para datos en tránsito y reposo. 3) Desarrollar componentes en C/C++ sobre entornos UNIX/Linux para automatización y hardening."
+            },
+            {
+                id: "T4", label: "🏅 TRAYECTO T4\nAnálisis Forense e\nInv. Penal (Mes 36)",
+                fullName: "Trayecto Formativo T4: Análisis Forense Digital e Investigación de Delitos Informáticos",
+                nodeType: "TRAYECTO", year: 3, term: 2, level: 6, hip: 192, hta: 558, total: 750, credits: 30, cluster: "TRAY", degree: "CERT",
+                certificateName: "Auxiliar Universitario/a en Informática Forense, Ciberdefensa e Investigación de Delitos Informáticos",
+                horizon: "Mes 36 — Especialización Técnica Intermedia (2°A 2°C + 3°A, articulado con 00303 = 40 Cr. / 1.000 hs)",
+                roles: "Auxiliar de Análisis Forense Digital (DFIR); Asistente Técnico de Perito Informático; Analista de Evidencia Digital en Fiscalías, Poder Judicial, Fuerzas de Seguridad y Consultoras Especializadas (NICE / ENISA ECSF).",
+                contents: "Certifica aptitudes para: 1) Aplicar metodologías de identificación, preservación, adquisición y análisis forense de evidencia digital en hardware y software resguardando la cadena de custodia. 2) Asistir en investigaciones penales de delitos informáticos y peritajes bajo estándares de la Convención de Budapest. 3) Integrar equipos de ciberdefensa bajo marco del Manual de Tallin."
+            },
+            {
+                id: "T5", label: "🏅 TRAYECTO T5\nOfensiva, CSIRT y\nCTI (Mes 42-48)",
+                fullName: "Trayecto Formativo T5: Operaciones Ofensivas, Respuesta a Incidentes y Ciberinteligencia",
+                nodeType: "TRAYECTO", year: 4, term: 2, level: 8, hip: 256, hta: 294, total: 550, credits: 22, cluster: "TRAY", degree: "CERT",
+                certificateName: "Especialista Universitario/a en Hacking Ético, Gestión de Incidentes y Ciberinteligencia (28 Cr. / 700 hs con Validación en Campo PPS)",
+                horizon: "Mes 42–48 — Especialización Operativa Avanzada (4° Año — Ciclo Licenciatura)",
+                roles: "Analista de Centro de Operaciones de Seguridad (SOC Tier 2–3); Especialista en Respuesta a Incidentes (CSIRT); Evaluador de Vulnerabilidades / Pentester; Analista de Ciberinteligencia de Amenazas (CTI) (NICE / ENISA ECSF).",
+                contents: "Certifica aptitudes para: 1) Planificar y ejecutar evaluaciones de seguridad ofensiva y pentesting sobre sistemas, redes, servidores y aplicaciones web. 2) Conducir procesos de contención, erradicación, recuperación y continuidad del negocio en entornos SOC/CSIRT. 3) Producir inteligencia de amenazas accionable (OSINT, ingeniería social, inteligencia financiera e ingeniería inversa)."
+            },
+
+            // ------------------------------------------------------------------------
+            // C. POSGRADO 1: MAESTRÍA EN INTELIGENCIA ARTIFICIAL E INTELIGENCIA DE PROCESOS
+            // ------------------------------------------------------------------------
+            {
+                id: "MIA-01", label: "ML y Deep Learning\nAvanzado (PEFT)", fullName: "1. Aprendizaje Automático y Aprendizaje Profundo Avanzado",
+                nodeType: "POSGRADO_IA", year: 5, term: 1, level: 9, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 1° Cuatrimestre (Modelos de IA de Vanguardia)",
+                contents: "Aprendizaje supervisado, no supervisado y por refuerzo profundo (DRL); regularización; ajuste fino paramétrico eficiente (PEFT: LoRA, QLoRA, Prefix Tuning); AutoML; optimización de hiperparámetros; talleres prácticos en clúster GPU remoto del LAB Ada Byron."
+            },
+            {
+                id: "MIA-02", label: "Transformers, MoE\ny Razonamiento", fullName: "2. Redes Neuronales Transformer, Modelos de Razonamiento Extendido y Arquitecturas MoE",
+                nodeType: "POSGRADO_IA", year: 5, term: 1, level: 9, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 1° Cuatrimestre (Modelos de IA de Vanguardia)",
+                contents: "Anatomía del Transformer: multi-head attention, FlashAttention; modelos de razonamiento extendido (thinking models, destilación CoT); arquitecturas Mixture of Experts (MoE), ruteo dinámico e inferencia distribuida."
+            },
+            {
+                id: "MIA-03", label: "Datos Distribuidos\ny Feature Stores", fullName: "3. Arquitecturas de Datos Distribuidos, Feature Stores y Gobernanza de Datos",
+                nodeType: "POSGRADO_IA", year: 5, term: 1, level: 9, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 1° Cuatrimestre (Modelos de IA de Vanguardia)",
+                contents: "Ingeniería de datos a escala; arquitecturas Lambda, Kappa y streaming; Feature Stores centrales; Data Contracts como gobernanza técnica; linaje de datos; seguridad de pipelines y mitigación de inyección de datos adversarios."
+            },
+            {
+                id: "MIA-04", label: "Estadística Bayesiana\ne Incertidumbre", fullName: "4. Estadística Bayesiana y Cuantificación de Incertidumbre en Sistemas de IA",
+                nodeType: "POSGRADO_IA", year: 5, term: 1, level: 9, hip: 40, hta: 110, total: 150, credits: 6, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 1° Cuatrimestre (Modelos de IA de Vanguardia)",
+                contents: "Inferencia bayesiana aplicada a modelos predictivos; MCMC e Inferencia Variacional; modelos gráficos probabilísticos; calibración de confianza en redes profundas; incertidumbre epistémica y aleatoria; análisis contrafáctico."
+            },
+            {
+                id: "MIA-05", label: "Agentes Autónomos\ny Sistemas MAS", fullName: "5. Arquitectura de Agentes Autónomos y Sistemas Multi-Agente",
+                nodeType: "POSGRADO_IA", year: 5, term: 2, level: 10, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 2° Cuatrimestre (Sistemas Agénticos e Interoperabilidad)",
+                contents: "Modelos formales de agencialidad; arquitecturas reactivas, deliberativas y BDI; LLMs como motores de razonamiento; patrones Chain-of-Thought, Tree-of-Thoughts, ReAct, Reflexion; sistemas multiagente (MAS), negociación y prevención de bucles en producción."
+            },
+            {
+                id: "MIA-06", label: "Ing. de Contexto\ny GraphRAG", fullName: "6. Ingeniería de Contexto, GraphRAG y Memoria Persistente",
+                nodeType: "POSGRADO_IA", year: 5, term: 2, level: 10, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 2° Cuatrimestre (Sistemas Agénticos e Interoperabilidad)",
+                contents: "Patrones avanzados de RAG; esquemas híbridos GraphRAG integrando bases vectoriales con grafos de conocimiento para mitigar alucinaciones; segmentación semántica y re-ranking; memoria persistente episódica, semántica y procedimental."
+            },
+            {
+                id: "MIA-07", label: "Protocolos Agénticos\n(MCP, A2A)", fullName: "7. Protocolos de Interoperabilidad Agéntica (MCP, A2A) y Orquestación",
+                nodeType: "POSGRADO_IA", year: 5, term: 2, level: 10, hip: 40, hta: 110, total: 150, credits: 6, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 2° Cuatrimestre (Sistemas Agénticos e Interoperabilidad)",
+                contents: "Estándares de conexión entre modelos y herramientas: Model Context Protocol (MCP) y comunicación Agent-to-Agent (A2A); seguridad, autenticación e intercambio de contextos en enjambres agénticos; gobernanza de mínimo privilegio en llamadas a herramientas."
+            },
+            {
+                id: "MIA-08", label: "LLMOps y Ciclo de\nVida en Producción", fullName: "8. LLMOps y Ciclo de Vida de Modelos de Producción",
+                nodeType: "POSGRADO_IA", year: 5, term: 2, level: 10, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 2° Cuatrimestre (Sistemas Agénticos e Interoperabilidad)",
+                contents: "Integración de LLMOps con CI/CD y MLOps; optimización de inferencia: cuantización (AWQ, GPTQ), poda y destilación; observabilidad en tiempo real y telemetría multiagente; guardrails y escalado a supervisión humana."
+            },
+            {
+                id: "MIA-09", label: "Automatización Agéntica\nde Procesos (APA)", fullName: "9. Automatización Agéntica de Procesos (APA) y Sistemas Autónomos de Soporte a la Decisión",
+                nodeType: "POSGRADO_IA", year: 6, term: 1, level: 11, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 3° Cuatrimestre (Gobernanza, Procesos y Especialización)",
+                contents: "Convergencia entre Minería de Procesos (Process Mining), RPA y orquestación agéntica; Sistemas Autónomos de Soporte a la Decisión (DSS); esquemas human-in-the-loop y human-on-the-loop; procesamiento de eventos complejos (CEP)."
+            },
+            {
+                id: "MIA-10", label: "Auditoría Algorítmica\ny Explicabilidad (XAI)", fullName: "10. Auditoría Algorítmica, XAI y Gobernanza de IA",
+                nodeType: "POSGRADO_IA", year: 6, term: 1, level: 11, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 3° Cuatrimestre (Gobernanza, Procesos y Especialización)",
+                contents: "Métodos formales de explicabilidad post-hoc: SHAP, LIME y mapas de saliencia; auditoría de sesgos y equidad algorítmica (fairness); evaluación de sistemas no deterministas; elaboración de Model Cards, Dataset Cards y reportes de auditoría."
+            },
+            {
+                id: "MIA-11", label: "Regulación IA\n(EU AI Act / ISO 42001)", fullName: "11. Gobernanza y Regulación de Sistemas Autónomos (EU AI Act, ISO/IEC 42001)",
+                nodeType: "POSGRADO_IA", year: 6, term: 1, level: 11, hip: 40, hta: 110, total: 150, credits: 6, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 3° Cuatrimestre (Gobernanza, Procesos y Especialización)",
+                contents: "Clasificación de riesgos y obligaciones bajo el EU AI Act (Reglamento UE 2024/1689); Sistemas de Gestión de IA (ISO/IEC 42001:2023); responsabilidad en fallas de agentes; trazabilidad de contenido sintético (C2PA); comités de ética algorítmica."
+            },
+            {
+                id: "MIA-12", label: "Metodología Inv.\nAplicada (IA)", fullName: "12. Metodología de la Investigación Aplicada y Elaboración de Trabajos Finales",
+                nodeType: "POSGRADO_IA", year: 6, term: 1, level: 11, hip: 26, hta: 74, total: 100, credits: 4, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 3° Cuatrimestre (Gobernanza, Procesos y Especialización)",
+                contents: "Epistemología y método en proyectos tecnológicos profesionales; revisión sistemática de literatura y patentes; diseño experimental y métricas de validación en producción; estructuración y aprobación del plan de Trabajo Final de Maestría."
+            },
+            {
+                id: "MIA-13", label: "Seminario Electivo\nSectorial (5 Verticales)", fullName: "Seminario de Especialización Sectorial (Trayecto Semiestructurado Electivo)",
+                nodeType: "POSGRADO_IA", year: 6, term: 1, level: 11, hip: 40, hta: 110, total: 150, credits: 6, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 3° Cuatrimestre (5 Menciones Garantizadas)",
+                roles: "Opciones Electivas: 1) IA en Fintech y DeFi (BCRA/GAFI) | 2) IA y Agentes en Agroindustria (AgTech) | 3) IA en Salud y Bioinformática (HIPAA/Ley 25.326/ANMAT) | 4) IA en Operaciones Industriales y Cobots | 5) IA en Gestión Pública y Parlamentaria (Orientación Distintiva UNSO).",
+                contents: "El maestrando elige 1 de las 5 verticales sectoriales para proyectar arquitecturas agénticas y minería de procesos contextualizadas a normativas y datos de dominio real."
+            },
+            {
+                id: "MIA-14", label: "🎓 Trabajo Final\nMaestría en IA (TFM)", fullName: "13. Trabajo Final de Maestría en Inteligencia Artificial e Inteligencia de Procesos",
+                nodeType: "POSGRADO_IA", year: 6, term: 2, level: 12, hip: 180, hta: 520, total: 700, credits: 28, cluster: "MIA", degree: "MAESTRIA_IA",
+                curricularBlock: "Maestría IA • 4° Cuatrimestre — Culminación Magíster (120 CRE / 3.000 hs)",
+                contents: "Desarrollo individual aplicado (prototipo agéntico, estudio de caso de optimización de procesos o auditoría algorítmica ISO 42001/EU AI Act) con 180 hs de tutorías directivas y ateneos, más 520 hs de desarrollo y defensa oral pública ante tribunal externo."
+            },
+
+            // ------------------------------------------------------------------------
+            // D. POSGRADO 2: MAESTRÍA EN INTELIGENCIA DE FUENTES ABIERTAS (OSINT) Y ANÁLISIS DIGITAL
+            // ------------------------------------------------------------------------
+            {
+                id: "MOS-01", label: "Doctrina Inteligencia,\nCiclo OSINT y OPSEC", fullName: "1. Doctrina de Inteligencia, Ciclo OSINT y OPSEC Avanzado",
+                nodeType: "POSGRADO_OSINT", year: 5, term: 1, level: 9, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MOS", degree: "ESP_OSINT",
+                curricularBlock: "Maestría / Especialización OSINT • 1° Cuatrimestre",
+                contents: "Teoría de inteligencia estratégica (Kent/Heuer); ciclo OSINT y formulación de PIRs. Modelo de amenazas y OPSEC. Fingerprinting avanzado (Canvas, WebGL, JA3/JA4). Aislamiento (Whonix, Tails, CSI Linux). Enrutamiento Tor, I2P, VPNs y gestión de sock puppets."
+            },
+            {
+                id: "MOS-02", label: "Recolección Autom.\ny Web Scraping", fullName: "2. Arquitectura de Recolección Automatizada y Web Scraping a Escala",
+                nodeType: "POSGRADO_OSINT", year: 5, term: 1, level: 9, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MOS", degree: "ESP_OSINT",
+                curricularBlock: "Maestría / Especialización OSINT • 1° Cuatrimestre",
+                contents: "Protocolos HTTP/S, WebSockets, gRPC. Inspección de tráfico (Burp Suite, ZAP) e ingeniería inversa de APIs no documentadas. Scraping en Python (HTTPX, Scrapy) y automatización headless (Playwright/Selenium) anti-bot. Pipelines con Airflow/Prefect y NoSQL (MongoDB, Elasticsearch)."
+            },
+            {
+                id: "MOS-03", label: "Redes Telecom., BGP\ny Recon. Pasivo", fullName: "3. Redes de Telecomunicaciones, Reconocimiento Pasivo y Huellas de Tráfico",
+                nodeType: "POSGRADO_OSINT", year: 5, term: 1, level: 9, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MOS", degree: "ESP_OSINT",
+                curricularBlock: "Maestría / Especialización OSINT • 1° Cuatrimestre",
+                contents: "Topología de Internet, sistemas autónomos (AS), enrutamiento BGP y tablas RIPE RIS. DNS pasivo (SecurityTrails) y Certificados TLS (crt.sh). Motores Shodan, Censys y FOFA. Detección pasiva de buckets cloud expuestos (S3, Azure, GCP)."
+            },
+            {
+                id: "MOS-04", label: "Marco Jurídico, Ley\n25.326 y Evidencia", fullName: "4. Marco Jurídico-Ético, Privacidad (Ley 25.326) y Admisibilidad Probatoria",
+                nodeType: "POSGRADO_OSINT", year: 5, term: 1, level: 9, hip: 40, hta: 110, total: 150, credits: 6, cluster: "MOS", degree: "ESP_OSINT",
+                curricularBlock: "Maestría / Especialización OSINT • 1° Cuatrimestre",
+                contents: "Protección de datos personales (Ley 25.326), Ley 25.520 de Inteligencia Nacional, Delitos Informáticos (Ley 26.388) y Convenio de Budapest (Ley 27.411). Cadena de custodia internacional (ISO/IEC 27037): formatos WARC/WACZ, sellado de tiempo RFC 3161 y hashes SHA-256/BLAKE3."
+            },
+            {
+                id: "MOS-05", label: "SOCMINT y Análisis\nde Grafos (SNA)", fullName: "5. SOCMINT, Minería en Redes Sociales y Análisis de Grafos Complejos (SNA)",
+                nodeType: "POSGRADO_OSINT", year: 5, term: 2, level: 10, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MOS", degree: "ESP_OSINT",
+                curricularBlock: "Maestría / Especialización OSINT • 2° Cuatrimestre",
+                contents: "Minería en redes abiertas y mensajería (Telegram Telethon/Pyrogram, Discord, X, TikTok). Social Network Analysis (SNA): métricas de centralidad y detección de comunidades (Louvain/Leiden) con Gephi y Maltego. Detección de bots, astroturfing y comportamiento inauténtico coordinado (CIB)."
+            },
+            {
+                id: "MOS-06", label: "GEOINT, IMINT Satelital\ny Verificación Visual", fullName: "6. GEOINT, IMINT Satelital y Verificación de Inteligencia Visual",
+                nodeType: "POSGRADO_OSINT", year: 5, term: 2, level: 10, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MOS", degree: "ESP_OSINT",
+                curricularBlock: "Maestría / Especialización OSINT • 2° Cuatrimestre",
+                contents: "Teledetección espacial y bandas espectrales (Copernicus Sentinel-1/2, Landsat, Planet Labs). Procesamiento con Google Earth Engine y QGIS. Geolocalización visual por elevación (DEMs) y sombras solares (SunCalc). Telemetría marítima y aérea (AIS / ADS-B)."
+            },
+            {
+                id: "MOS-07", label: "Dark Web, Tor/I2P\ne Infiltración Pasiva", fullName: "7. Dark Web, Ecosistemas Clandestinos e Infiltración Pasiva",
+                nodeType: "POSGRADO_OSINT", year: 5, term: 2, level: 10, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MOS", degree: "ESP_OSINT",
+                curricularBlock: "Maestría / Especialización OSINT • 2° Cuatrimestre",
+                contents: "Servicios ocultos en Tor (.onion v3), I2P y ZeroNet. Monitoreo pasivo de foros de ransomware y mercados de accesos iniciales (IABs). Análisis de data breaches y correlación de infraestructura de comando y control (C2)."
+            },
+            {
+                id: "MOS-08", label: "🔍 TFI Especialización\nen OSINT (60 CRE)", fullName: "8. Taller de Trabajo Final Integrador (TFI) — Título Intermedio: Especialista en OSINT",
+                nodeType: "POSGRADO_OSINT", year: 5, term: 2, level: 10, hip: 40, hta: 110, total: 150, credits: 6, cluster: "MOS", degree: "ESP_OSINT",
+                curricularBlock: "Hito Título Intermedio Posgrado • Especialista en OSINT (1° Año: 60 CRE / 1.500 hs)",
+                roles: "Otorga título oficial de posgrado de Especialista en Inteligencia de Fuentes Abiertas (OSINT) al completar los primeros 60 CRE (408 hs IP + 1.092 hs TA).",
+                contents: "Formulación de informes operativos de ciberinteligencia sobre caso real o simulado integrando recolección, grafos SNA, verificación visual, geolocalización y cadena de custodia WARC/RFC 3161."
+            },
+            {
+                id: "MOS-09", label: "Forensia Cripto y\nBlockchain Analytics", fullName: "9. Forensia de Activos Virtuales, Blockchain Analytics y Crypto-OSINT",
+                nodeType: "POSGRADO_OSINT", year: 6, term: 1, level: 11, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MOS", degree: "MAESTRIA_OSINT",
+                curricularBlock: "Maestría OSINT • 3° Cuatrimestre (IA Agéntica, Crypto-OSINT y Análisis)",
+                contents: "Modelos UTXO (Bitcoin) y cuentas (Ethereum). Análisis on-chain y mecanismos de ofuscación (mixers, CoinJoin, Monero). Heurísticas de clustering de billeteras, rastreo de pagos de ransomware, estafas DeFi y requerimientos a exchanges (VASPs)."
+            },
+            {
+                id: "MOS-10", label: "OSINT Aumentado:\nAgentic AI y Coquena", fullName: "10. OSINT Aumentado: Arquitectura de Agentes Autónomos (Agentic AI) y LLMs",
+                nodeType: "POSGRADO_OSINT", year: 6, term: 1, level: 11, hip: 48, hta: 152, total: 200, credits: 8, cluster: "MOS", degree: "MAESTRIA_OSINT",
+                curricularBlock: "Maestría OSINT • 3° Cuatrimestre (IA Agéntica, Crypto-OSINT y Análisis)",
+                contents: "Agentes autónomos en OSINT con LangChain/LangGraph. Inferencia local con LLMs de código abierto mediante el Framework Coquena (desarrollo propio UNSO) y Ollama. Extracción de entidades (NER) multilingüe y detección forense de deepfakes y medios sintéticos."
+            },
+            {
+                id: "MOS-11", label: "Knowledge Graphs,\nGraphRAG y Neo4j", fullName: "11. Knowledge Graphs, GraphRAG y Fusión Multifuente en Neo4j",
+                nodeType: "POSGRADO_OSINT", year: 6, term: 1, level: 11, hip: 40, hta: 110, total: 150, credits: 6, cluster: "MOS", degree: "MAESTRIA_OSINT",
+                curricularBlock: "Maestría OSINT • 3° Cuatrimestre (IA Agéntica, Crypto-OSINT y Análisis)",
+                contents: "Modelado ontológico de amenazas bajo esquemas STIX 2.1 y MITRE ATT&CK. Bases de datos orientadas a grafos en Neo4j y consultas Cypher. Arquitecturas GraphRAG para fusión semántica multifuente y detección de patrones en redes criminales."
+            },
+            {
+                id: "MOS-12", label: "Métodos SATs y\nGuerra Cognitiva", fullName: "12. Métodos Estructurados de Análisis (SATs), Desinformación y Guerra Cognitiva",
+                nodeType: "POSGRADO_OSINT", year: 6, term: 1, level: 11, hip: 40, hta: 110, total: 150, credits: 6, cluster: "MOS", degree: "MAESTRIA_OSINT",
+                curricularBlock: "Maestría OSINT • 3° Cuatrimestre (IA Agéntica, Crypto-OSINT y Análisis)",
+                contents: "Psicología del análisis y mitigación de sesgos cognitivos. Técnicas Estructuradas (SATs): Análisis de Hipótesis Competitivas (ACH) y Red Teaming. Matrices de certeza (Código Admiralty / STANAG 2064). Guerra híbrida, marco DISARM y briefings ejecutivos."
+            },
+            {
+                id: "MOS-13", label: "Metodología Inv.\nAplicada (OSINT)", fullName: "13. Metodología de la Investigación Aplicada y Elaboración de Trabajos Finales",
+                nodeType: "POSGRADO_OSINT", year: 6, term: 1, level: 11, hip: 26, hta: 74, total: 100, credits: 4, cluster: "MOS", degree: "MAESTRIA_OSINT",
+                curricularBlock: "Maestría OSINT • 3° Cuatrimestre (IA Agéntica, Crypto-OSINT y Análisis)",
+                contents: "Epistemología y diseño de investigación aplicada de posgrado en inteligencia digital. Estudios de caso, prototipado tecnológico y análisis empírico. Estructuración formal del plan de Trabajo Final de Maestría (TFM)."
+            },
+            {
+                id: "MOS-14", label: "🎓 Trabajo Final\nMaestría OSINT (TFM)", fullName: "14. Trabajo Final de Maestría en Inteligencia de Fuentes Abiertas (OSINT) y Análisis Digital",
+                nodeType: "POSGRADO_OSINT", year: 6, term: 2, level: 12, hip: 180, hta: 520, total: 700, credits: 28, cluster: "MOS", degree: "MAESTRIA_OSINT",
+                curricularBlock: "Maestría OSINT • 4° Cuatrimestre — Culminación Magíster (120 CRE / 3.000 hs)",
+                contents: "Desarrollo tecnológico de IA agéntica/scraping, estudio analítico empírico de redes de cibercrimen o dictamen pericial avanzado original (180 hs tutorías y ateneos + 520 hs desarrollo), con defensa pública ante jurado tripartito con miembro externo."
+            }
+        ];
+
+        // ============================================================================
+        // 3. RELACIONES DEL ECOSISTEMA (CORRELATIVAS, TRAYECTOS, POSGRADOS Y AFINIDAD)
+        // ============================================================================
+        const rawEdges = [
+            // --- A. CORRELATIVAS REGULARIZADAS DE GRADO (Cursada aprobada requerida) ---
+            { from: "00302", to: "00307", type: "REGULAR", label: "REGULAR" },
+            { from: "00304", to: "00307", type: "REGULAR", label: "REGULAR" },
+            { from: "00075", to: "00308", type: "REGULAR", label: "REGULAR" },
+            { from: "00306", to: "00310", type: "REGULAR", label: "REGULAR" },
+            { from: "00303", to: "00310", type: "REGULAR", label: "REGULAR" },
+            { from: "00075", to: "00311", type: "REGULAR", label: "REGULAR" },
+            { from: "00305", to: "00311", type: "REGULAR", label: "REGULAR" },
+            { from: "00075", to: "00312", type: "REGULAR", label: "REGULAR" },
+            { from: "00306", to: "00313", type: "REGULAR", label: "REGULAR" },
+            { from: "00308", to: "00314", type: "REGULAR", label: "REGULAR" },
+            { from: "00307", to: "00314", type: "REGULAR", label: "REGULAR" },
+            { from: "00311", to: "00315", type: "REGULAR", label: "REGULAR" },
+            { from: "00310", to: "00316", type: "REGULAR", label: "REGULAR" },
+            { from: "00315", to: "00319", type: "REGULAR", label: "REGULAR" },
+            { from: "00317", to: "00511", type: "REGULAR", label: "REGULAR" },
+            { from: "00317", to: "00513", type: "REGULAR", label: "REGULAR" },
+            { from: "00317", to: "00514", type: "REGULAR", label: "REGULAR" },
+            { from: "00317", to: "00516", type: "REGULAR", label: "REGULAR" },
+            { from: "00317", to: "00518", type: "REGULAR", label: "REGULAR" },
+
+            // --- B. CORRELATIVAS APROBADAS DE GRADO (Final aprobado requerido) ---
+            { from: "00302", to: "00311", type: "APROBADA", label: "APROBADA" },
+            { from: "00303", to: "00313", type: "APROBADA", label: "APROBADA" },
+            { from: "00075", to: "00314", type: "APROBADA", label: "APROBADA" },
+            { from: "00302", to: "00315", type: "APROBADA", label: "APROBADA" },
+            { from: "00303", to: "00315", type: "APROBADA", label: "APROBADA" },
+            { from: "00304", to: "00315", type: "APROBADA", label: "APROBADA" },
+            { from: "00303", to: "00316", type: "APROBADA", label: "APROBADA" },
+            { from: "00306", to: "00316", type: "APROBADA", label: "APROBADA" },
+            { from: "00307", to: "00316", type: "APROBADA", label: "APROBADA" },
+            { from: "00310", to: "00317", type: "APROBADA", label: "APROBADA" },
+            { from: "00307", to: "00318", type: "APROBADA", label: "APROBADA" },
+            { from: "00310", to: "00119", type: "APROBADA", label: "APROBADA" },
+            { from: "00316", to: "00320", type: "APROBADA", label: "APROBADA" },
+            { from: "00316", to: "00511", type: "APROBADA", label: "APROBADA" },
+            { from: "00310", to: "00512", type: "APROBADA", label: "APROBADA" },
+            { from: "00310", to: "00515", type: "APROBADA", label: "APROBADA" },
+            { from: "00316", to: "00516", type: "APROBADA", label: "APROBADA" },
+            { from: "00310", to: "00517", type: "APROBADA", label: "APROBADA" },
+            { from: "00310", to: "00518", type: "APROBADA", label: "APROBADA" },
+
+            // --- C. ACREDITACIÓN DE TRAYECTOS FORMATIVOS (T1 A T5) ---
+            // Trayecto T1 (40 Cr. / 1000 hs - Mes 18)
+            { from: "00303", to: "T1", type: "TRAYECTO", label: "INTEGRA T1", topic: "10 Cr. SACAU para Certificación T1" },
+            { from: "00305", to: "T1", type: "TRAYECTO", label: "INTEGRA T1", topic: "10 Cr. SACAU para Certificación T1" },
+            { from: "00306", to: "T1", type: "TRAYECTO", label: "INTEGRA T1", topic: "10 Cr. SACAU para Certificación T1" },
+            { from: "00310", to: "T1", type: "TRAYECTO", label: "CIERRA T1", topic: "Hito Mes 18: Completa los 40 Cr. de T1" },
+
+            // Trayecto T2 (50 Cr. / 1250 hs - Mes 24)
+            { from: "00302", to: "T2", type: "TRAYECTO", label: "INTEGRA T2", topic: "10 Cr. SACAU para Certificación T2" },
+            { from: "00304", to: "T2", type: "TRAYECTO", label: "INTEGRA T2", topic: "10 Cr. SACAU para Certificación T2" },
+            { from: "00307", to: "T2", type: "TRAYECTO", label: "INTEGRA T2", topic: "10 Cr. SACAU para Certificación T2" },
+            { from: "00311", to: "T2", type: "TRAYECTO", label: "INTEGRA T2", topic: "10 Cr. SACAU para Certificación T2" },
+            { from: "00312", to: "T2", type: "TRAYECTO", label: "CIERRA T2", topic: "Hito Mes 24: Completa los 50 Cr. de T2" },
+
+            // Trayecto T3 (40 Cr. / 1000 hs - Mes 36)
+            { from: "00314", to: "T3", type: "TRAYECTO", label: "INTEGRA T3", topic: "10 Cr. SACAU para Certificación T3" },
+            { from: "00315", to: "T3", type: "TRAYECTO", label: "INTEGRA T3", topic: "10 Cr. SACAU para Certificación T3" },
+            { from: "00318", to: "T3", type: "TRAYECTO", label: "INTEGRA T3", topic: "10 Cr. SACAU para Certificación T3" },
+            { from: "00319", to: "T3", type: "TRAYECTO", label: "CIERRA T3", topic: "Hito Mes 36: Completa los 40 Cr. de T3" },
+
+            // Trayecto T4 (30 Cr. específicos + 10 Cr. articulados con 00303 = 40 Cr. - Mes 36)
+            { from: "00303", to: "T4", type: "TRAYECTO", label: "BASE T4 (T1)", topic: "Articulación previa obligatoria (10 Cr. de 1°A 1°C)" },
+            { from: "00313", to: "T4", type: "TRAYECTO", label: "INTEGRA T4", topic: "10 Cr. SACAU para Certificación T4" },
+            { from: "00316", to: "T4", type: "TRAYECTO", label: "INTEGRA T4", topic: "10 Cr. SACAU para Certificación T4" },
+            { from: "00317", to: "T4", type: "TRAYECTO", label: "CIERRA T4", topic: "Hito Mes 36: Completa Certificación Forense T4" },
+
+            // Trayecto T5 (22 Cr. núcleo + 6 Cr. Validación en Campo PPS = 28 Cr. - Mes 48)
+            { from: "00513", to: "T5", type: "TRAYECTO", label: "INTEGRA T5", topic: "6 Cr. SACAU para Certificación T5" },
+            { from: "00511", to: "T5", type: "TRAYECTO", label: "INTEGRA T5", topic: "10 Cr. SACAU para Certificación T5" },
+            { from: "00516", to: "T5", type: "TRAYECTO", label: "CIERRA T5", topic: "Hito Mes 48: Completa los 22 Cr. núcleo de T5" },
+            { from: "00320", to: "T5", type: "TRAYECTO", label: "VALIDA CAMPO", topic: "Adiciona mención de Validación en Campo (+6 Cr. = 28 Cr. / 700 hs)" },
+
+            // Escalera progresiva entre Trayectos
+            { from: "T1", to: "T3", type: "TRAYECTO", label: "PROGRESIÓN", topic: "Escalera de empleabilidad: de Sistemas Seguros a Infraestructura Linux/Cripto" },
+            { from: "T1", to: "T4", type: "TRAYECTO", label: "PROGRESIÓN", topic: "Escalera de empleabilidad: de Normativa Base a Peritaje Forense" },
+            { from: "T3", to: "T5", type: "TRAYECTO", label: "PROGRESIÓN", topic: "Escalera de empleabilidad: de Hardening y Redes a Pentesting Ofensivo" },
+            { from: "T4", to: "T5", type: "TRAYECTO", label: "PROGRESIÓN", topic: "Escalera de empleabilidad: de DFIR Forense a CSIRT y Ciberinteligencia" },
+
+            // --- D. SECUENCIA INTERNA DE LA MAESTRÍA EN IA E INTELIGENCIA DE PROCESOS ---
+            { from: "MIA-01", to: "MIA-05", type: "POSGRADO", label: "1°C → 2°C", topic: "De Deep Learning a Arquitecturas de Agentes Autónomos" },
+            { from: "MIA-02", to: "MIA-05", type: "POSGRADO", label: "1°C → 2°C", topic: "Modelos Transformer/MoE como motores de razonamiento agéntico" },
+            { from: "MIA-02", to: "MIA-06", type: "POSGRADO", label: "1°C → 2°C", topic: "Modelos fundacionales aplicados a Ingeniería de Contexto y GraphRAG" },
+            { from: "MIA-03", to: "MIA-06", type: "POSGRADO", label: "1°C → 2°C", topic: "Feature Stores y pipelines hacia bases vectoriales y grafos" },
+            { from: "MIA-03", to: "MIA-08", type: "POSGRADO", label: "1°C → 2°C", topic: "Ingeniería de datos aplicada a pipelines LLMOps" },
+            { from: "MIA-04", to: "MIA-10", type: "POSGRADO", label: "1°C → 3°C", topic: "Cuantificación bayesiana de incertidumbre para Auditoría Algorítmica y XAI" },
+            { from: "MIA-05", to: "MIA-07", type: "POSGRADO", label: "2°C", topic: "Sistemas Multi-Agente orquestados vía protocolos MCP y A2A" },
+            { from: "MIA-05", to: "MIA-09", type: "POSGRADO", label: "2°C → 3°C", topic: "Agentes autónomos aplicados a Automatización Agéntica de Procesos (APA)" },
+            { from: "MIA-07", to: "MIA-09", type: "POSGRADO", label: "2°C → 3°C", topic: "Interoperabilidad MCP/A2A sobre flujos de Process Mining" },
+            { from: "MIA-08", to: "MIA-10", type: "POSGRADO", label: "2°C → 3°C", topic: "Telemetría LLMOps e inspección de modelos en producción" },
+            { from: "MIA-10", to: "MIA-11", type: "POSGRADO", label: "3°C", topic: "Explicabilidad XAI y fairness para cumplimiento de EU AI Act e ISO 42001" },
+            { from: "MIA-09", to: "MIA-13", type: "POSGRADO", label: "3°C", topic: "Aplicación de APA en las 5 verticales del Seminario Sectorial" },
+            { from: "MIA-12", to: "MIA-14", type: "POSGRADO", label: "PLAN TFM", topic: "Habilita y estructura el Trabajo Final de Maestría en IA (28 CRE)" },
+            { from: "MIA-13", to: "MIA-14", type: "POSGRADO", label: "VERTICAL TFM", topic: "Caso de aplicación sectorial para el Trabajo Final de Maestría" },
+
+            // --- E. SECUENCIA INTERNA DE LA MAESTRÍA Y ESPECIALIZACIÓN EN OSINT ---
+            { from: "MOS-01", to: "MOS-05", type: "POSGRADO", label: "1°C → 2°C", topic: "OPSEC y sock puppets aplicados a minería SOCMINT" },
+            { from: "MOS-01", to: "MOS-07", type: "POSGRADO", label: "1°C → 2°C", topic: "Entornos aislados Whonix/CSI Linux para infiltración pasiva en Dark Web" },
+            { from: "MOS-02", to: "MOS-05", type: "POSGRADO", label: "1°C → 2°C", topic: "Scrapers automatizados para extracción en Telegram, Discord y redes" },
+            { from: "MOS-03", to: "MOS-06", type: "POSGRADO", label: "1°C → 2°C", topic: "Correlación de telemetría de red con geolocalización satelital y AIS/ADS-B" },
+            { from: "MOS-03", to: "MOS-07", type: "POSGRADO", label: "1°C → 2°C", topic: "Huellas de tráfico y certificados TLS para rastreo de servidores C2 en Darknet" },
+            { from: "MOS-04", to: "MOS-08", type: "POSGRADO", label: "CUSTODIA TFI", topic: "Admisibilidad probatoria ISO 27037 y WARC en el TFI de Especialización" },
+            { from: "MOS-05", to: "MOS-08", type: "POSGRADO", label: "INTEGRA TFI", topic: "Cierre del 1° Año: Título Intermedio de Especialista en OSINT (60 CRE)" },
+            { from: "MOS-06", to: "MOS-08", type: "POSGRADO", label: "INTEGRA TFI", topic: "Cierre del 1° Año: Título Intermedio de Especialista en OSINT (60 CRE)" },
+            { from: "MOS-07", to: "MOS-08", type: "POSGRADO", label: "INTEGRA TFI", topic: "Cierre del 1° Año: Título Intermedio de Especialista en OSINT (60 CRE)" },
+            { from: "MOS-08", to: "MOS-09", type: "POSGRADO", label: "ESP → MAESTRÍA", topic: "Continuidad del Especialista hacia Crypto-OSINT y Blockchain Analytics" },
+            { from: "MOS-08", to: "MOS-10", type: "POSGRADO", label: "ESP → MAESTRÍA", topic: "Continuidad hacia OSINT Aumentado con Agentic AI y Framework Coquena" },
+            { from: "MOS-05", to: "MOS-11", type: "POSGRADO", label: "2°C → 3°C", topic: "De análisis de grafos SNA a Knowledge Graphs y GraphRAG en Neo4j" },
+            { from: "MOS-10", to: "MOS-11", type: "POSGRADO", label: "3°C", topic: "Agentes LLMs alimentando grafos ontológicos STIX 2.1 / MITRE ATT&CK en Neo4j" },
+            { from: "MOS-11", to: "MOS-12", type: "POSGRADO", label: "3°C", topic: "Grafos de conocimiento aplicados a detección de Guerra Cognitiva y SATs" },
+            { from: "MOS-13", to: "MOS-14", type: "POSGRADO", label: "PLAN TFM", topic: "Diseño metodológico hacia el Trabajo Final de Maestría en OSINT (28 CRE)" },
+            { from: "MOS-11", to: "MOS-14", type: "POSGRADO", label: "DESARROLLO TFM", topic: "Fusión multifuente e IA agéntica aplicada a la tesis de Maestría" },
+
+            // --- F. PUENTES DE ARTICULACIÓN GRADO / TRAYECTOS → POSGRADOS (EQUIVALENCIAS Y CONTINUIDAD) ---
+            { from: "00308", to: "MIA-04", type: "POSGRADO", label: "BASE MATEMÁTICA", topic: "Articulación Grado→Posgrado (hasta 30% equiv.): Cálculo Aplicado hacia Estadística Bayesiana" },
+            { from: "00311", to: "MIA-03", type: "POSGRADO", label: "BASE DATOS", topic: "Articulación Grado→Posgrado: Bases de Datos SQL hacia Arquitecturas Distribuidas y Feature Stores" },
+            { from: "T2", to: "MIA-01", type: "POSGRADO", label: "ARTICULA POSGRADO", topic: "El Trayecto T2 de Desarrollo y Datos cimienta el ingreso a la Maestría en IA" },
+            { from: "00514", to: "MIA-11", type: "POSGRADO", label: "COMPLIANCE → IA", topic: "De Protección de Datos y Compliance de Grado a Regulación EU AI Act e ISO 42001" },
+            { from: "00516", to: "MOS-01", type: "POSGRADO", label: "CTI → MAESTRÍA OSINT", topic: "Articulación directa entre Ciberinteligencia de 4° año y la Maestría en OSINT" },
+            { from: "T5", to: "MOS-10", type: "POSGRADO", label: "T5 → AGENTIC OSINT", topic: "Especialistas del Trayecto T5 escalan hacia automatización OSINT con Framework Coquena" },
+            { from: "T4", to: "MOS-04", type: "POSGRADO", label: "DFIR → ISO 27037", topic: "Continuidad forense: del Trayecto T4 al peritaje OSINT con sellado WARC/RFC 3161" },
+            { from: "00518", to: "MIA-12", type: "POSGRADO", label: "GRADO → POSGRADO", topic: "Continuidad del graduado de Licenciatura hacia la investigación de Maestría en IA" },
+            { from: "00518", to: "MOS-13", type: "POSGRADO", label: "GRADO → POSGRADO", topic: "Continuidad del graduado de Licenciatura hacia la investigación de Maestría en OSINT" },
+
+            // --- G. AFINIDAD TEMÁTICA Y SINERGIAS TRANSVERSALES (GRADO + AMBAS MAESTRÍAS) ---
+            { from: "00302", to: "00312", type: "AFINIDAD", label: "Ing. de Software", topic: "Diseño y planificación de sistemas de información" },
+            { from: "00305", to: "00315", type: "AFINIDAD", label: "Sist. Operativos y Redes", topic: "Arquitecturas distribuidas y SO de red" },
+            { from: "00305", to: "00318", type: "AFINIDAD", label: "UNIX / Linux Kernel", topic: "Arquitectura de SO aplicada a programación C/C++ en Linux" },
+            { from: "00306", to: "00513", type: "AFINIDAD", label: "Gestión de Incidentes", topic: "Protección de infraestructuras críticas y resiliencia operativa" },
+            { from: "00313", to: "00517", type: "AFINIDAD", label: "Geopolítica y Manual Tallin", topic: "Ciberguerra, derecho internacional y diplomacia en ciberespacio" },
+            { from: "00314", to: "00511", type: "AFINIDAD", label: "Seguridad de Protocolos", topic: "Análisis criptográfico y explotación de vulnerabilidades" },
+            { from: "00316", to: "00317", type: "AFINIDAD", label: "Peritaje y Cadena Custodia", topic: "Evidencia digital forense aplicada al proceso penal y Convención de Budapest" },
+            { from: "00318", to: "00511", type: "AFINIDAD", label: "Exploits y Bajo Nivel", topic: "Estructuras en C/C++ y memoria para identificación de vulnerabilidades" },
+            { from: "00314", to: "MOS-09", type: "AFINIDAD", label: "Criptografía → Blockchain", topic: "Fundamentos criptográficos aplicados a forensia de activos virtuales UTXO/DeFi" },
+            { from: "00319", to: "MOS-03", type: "AFINIDAD", label: "BGP y Telemetría", topic: "Ingeniería de redes aplicada a reconocimiento pasivo de Sistemas Autónomos y Shodan" },
+            { from: "MIA-05", to: "MOS-10", type: "AFINIDAD", label: "Sinergia Multi-Agente", topic: "Arquitecturas MAS compartidas entre la Maestría en IA y el Framework Coquena de OSINT" },
+            { from: "MIA-06", to: "MOS-11", type: "AFINIDAD", label: "Sinergia GraphRAG / Neo4j", topic: "Integración transversal de Grafos de Conocimiento y LLMs entre ambas Maestrías" }
+        ];
+
+        // ============================================================================
+        // 4. INICIALIZACIÓN DE VIS.JS Y CONFIGURACIÓN VISUAL DE NODOS Y ARISTAS
+        // ============================================================================
+        let network = null;
+        let nodesDataset = new vis.DataSet();
+        let edgesDataset = new vis.DataSet();
+        let currentLayout = 'force';
+        let activeClusterFilter = 'ALL';
+
+        function isMobileViewport() {
+            return window.innerWidth <= 900;
+        }
+
+        function buildVisNodes() {
+            return rawSubjects.map(s => {
+                const cMeta = CLUSTER_META[s.cluster];
+                const outDegree = rawEdges.filter(e => e.from === s.id && (e.type === 'APROBADA' || e.type === 'REGULAR' || e.type === 'POSGRADO')).length;
+
+                let shape = "dot";
+                let baseSize = 21 + (outDegree * 2.0);
+                let borderColor = "#ffffff";
+                let borderWidth = 2;
+
+                if (s.nodeType === "TRAYECTO") {
+                    shape = "hexagon";
+                    baseSize = 31;
+                    borderColor = "#fef08a";
+                    borderWidth = 3;
+                } else if (s.nodeType === "POSGRADO_IA") {
+                    shape = "diamond";
+                    baseSize = s.id === "MIA-14" ? 30 : 23;
+                    borderColor = "#cffafe";
+                } else if (s.nodeType === "POSGRADO_OSINT") {
+                    shape = (s.id === "MOS-08" || s.id === "MOS-14") ? "star" : "triangle";
+                    baseSize = (s.id === "MOS-08" || s.id === "MOS-14") ? 30 : 22;
+                    borderColor = "#ffedd5";
+                }
+
+                return {
+                    id: s.id,
+                    label: `${s.label}\n[${s.id}]`,
+                    level: s.level,
+                    cluster: s.cluster,
+                    year: s.year,
+                    degree: s.degree,
+                    nodeType: s.nodeType,
+                    trayecto: s.trayecto || null,
+                    shape: shape,
+                    size: baseSize,
+                    color: {
+                        background: cMeta.color,
+                        border: borderColor,
+                        highlight: { background: "#ffffff", border: cMeta.color },
+                        hover: { background: cMeta.color, border: "#38bdf8" }
+                    },
+                    font: {
+                        color: "#f3f4f6",
+                        size: s.nodeType === "TRAYECTO" ? 12 : 11,
+                        face: "Inter",
+                        multi: true,
+                        vadjust: 4
+                    },
+                    borderWidth: borderWidth,
+                    shadow: {
+                        enabled: true,
+                        color: cMeta.color,
+                        size: s.nodeType === "TRAYECTO" ? 18 : 11,
+                        x: 0,
+                        y: 0
+                    }
+                };
+            });
+        }
+
+        function buildVisEdges() {
+            return rawEdges.map((e, idx) => {
+                let colorObj, dashes, width, fontColor;
+                if (e.type === "APROBADA") {
+                    colorObj = { color: "#ef4444", highlight: "#ff6b6b", hover: "#ff6b6b" };
+                    dashes = false;
+                    width = 2.3;
+                    fontColor = "#fca5a5";
+                } else if (e.type === "REGULAR") {
+                    colorObj = { color: "#f59e0b", highlight: "#fcd34d", hover: "#fcd34d" };
+                    dashes = [6, 4];
+                    width = 1.9;
+                    fontColor = "#fde68a";
+                } else if (e.type === "TRAYECTO") {
+                    colorObj = { color: "#eab308", highlight: "#fef08a", hover: "#fef08a", opacity: 0.85 };
+                    dashes = false;
+                    width = 2.2;
+                    fontColor = "#fef08a";
+                } else if (e.type === "POSGRADO") {
+                    colorObj = { color: "#10b981", highlight: "#6ee7b7", hover: "#6ee7b7", opacity: 0.85 };
+                    dashes = [8, 4];
+                    width = 2.0;
+                    fontColor = "#6ee7b7";
+                } else {
+                    colorObj = { color: "#38bdf8", highlight: "#7dd3fc", hover: "#7dd3fc", opacity: 0.6 };
+                    dashes = [2, 4];
+                    width = 1.4;
+                    fontColor = "#7dd3fc";
+                }
+
+                return {
+                    id: `e_${idx}`,
+                    from: e.from,
+                    to: e.to,
+                    type: e.type,
+                    label: e.label,
+                    title: e.topic ? `${e.label}: ${e.topic}` : `Relación: ${e.label}`,
+                    arrows: { to: { enabled: true, scaleFactor: 0.68 } },
+                    color: colorObj,
+                    dashes: dashes,
+                    width: width,
+                    font: {
+                        size: 8.5,
+                        color: fontColor,
+                        face: "Fira Code",
+                        strokeWidth: 3,
+                        strokeColor: "#0b0f19",
+                        align: "middle"
+                    },
+                    smooth: {
+                        type: "dynamic",
+                        roundness: 0.5
+                    }
+                };
+            });
+        }
+
+        function getNetworkOptions(layoutType) {
+            const isHier = layoutType === 'hierarchical';
+            return {
+                layout: {
+                    hierarchical: isHier ? {
+                        enabled: true,
+                        direction: "LR",
+                        sortMethod: "directed",
+                        levelSeparation: 220,
+                        nodeSpacing: 135
+                    } : { enabled: false }
+                },
+                physics: {
+                    enabled: !isHier,
+                    barnesHut: {
+                        gravitationalConstant: -4800,
+                        centralGravity: 0.22,
+                        springLength: 180,
+                        springConstant: 0.038,
+                        damping: 0.09,
+                        avoidOverlap: 0.55
+                    },
+                    stabilization: { iterations: 220 }
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 120,
+                    navigationButtons: false,
+                    keyboard: true
+                }
+            };
+        }
+
+        function initGraph() {
+            const container = document.getElementById("network-container");
+            nodesDataset.add(buildVisNodes());
+            edgesDataset.add(buildVisEdges());
+
+            network = new vis.Network(
+                container,
+                { nodes: nodesDataset, edges: edgesDataset },
+                getNetworkOptions(currentLayout)
+            );
+
+            network.on("click", function (params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    selectSubjectNode(nodeId);
+                    if (isMobileViewport()) {
+                        openDrawer('right');
+                    }
+                } else {
+                    clearSelection();
+                }
+            });
+
+            updateStats();
+            renderOverviewInspector();
+        }
+
+        // ============================================================================
+        // 5. CONTROL DE CAJONES RESPONSIVE (DRAWERS) Y REAJUSTE DE CANVAS
+        // ============================================================================
+        function openDrawer(side) {
+            const leftEl = document.getElementById("sidebar-left");
+            const rightEl = document.getElementById("inspector-panel");
+            const backdrop = document.getElementById("drawer-backdrop");
+            const fabLeft = document.getElementById("fab-left");
+            const fabRight = document.getElementById("fab-right");
+
+            if (side === 'left') {
+                rightEl.classList.remove("drawer-open");
+                fabRight.classList.remove("active");
+                leftEl.classList.add("drawer-open");
+                fabLeft.classList.add("active");
+            } else if (side === 'right') {
+                leftEl.classList.remove("drawer-open");
+                fabLeft.classList.remove("active");
+                rightEl.classList.add("drawer-open");
+                fabRight.classList.add("active");
+            }
+            backdrop.classList.add("active");
+        }
+
+        function closeAllDrawers(shouldFit = true) {
+            const leftEl = document.getElementById("sidebar-left");
+            const rightEl = document.getElementById("inspector-panel");
+            const backdrop = document.getElementById("drawer-backdrop");
+            const fabLeft = document.getElementById("fab-left");
+            const fabRight = document.getElementById("fab-right");
+
+            const wasOpen = leftEl.classList.contains("drawer-open") || rightEl.classList.contains("drawer-open");
+
+            leftEl.classList.remove("drawer-open");
+            rightEl.classList.remove("drawer-open");
+            backdrop.classList.remove("active");
+            fabLeft.classList.remove("active");
+            fabRight.classList.remove("active");
+
+            if (shouldFit && wasOpen && network) {
+                setTimeout(() => {
+                    network.fit({ animation: { duration: 450, easingFunction: "easeInOutQuad" } });
+                }, 280);
+            }
+        }
+
+        function toggleDrawer(side) {
+            const targetEl = side === 'left'
+                ? document.getElementById("sidebar-left")
+                : document.getElementById("inspector-panel");
+
+            if (targetEl.classList.contains("drawer-open")) {
+                closeAllDrawers(true);
+            } else {
+                openDrawer(side);
+            }
+        }
+
+        window.addEventListener("resize", () => {
+            if (!isMobileViewport()) {
+                closeAllDrawers(false);
+            }
+        });
+
+        // ============================================================================
+        // 6. INSPECTOR DINÁMICO (GRADO, TRAYECTOS FORMATIVOS Y POSGRADOS)
+        // ============================================================================
+        function selectSubjectNode(subjectId) {
+            const subj = rawSubjects.find(s => s.id === subjectId);
+            if (!subj) return;
+
+            network.selectNodes([subjectId]);
+
+            const cypherEl = document.getElementById("cypher-display");
+            cypherEl.innerHTML = `<span class="kw">MATCH</span> (p)-[r]-&gt;(n {id: <span style="color:#a7f3d0">'${subj.id}'</span>})-[s]-&gt;(m) <span class="kw">RETURN</span> p, r, n, s, m;`;
+
+            const cMeta = CLUSTER_META[subj.cluster];
+            const incoming = rawEdges.filter(e => e.to === subj.id);
+            const outgoing = rawEdges.filter(e => e.from === subj.id);
+
+            const mapEdgeChip = (e, direction) => {
+                const otherId = direction === 'IN' ? e.from : e.to;
+                const otherSubj = rawSubjects.find(s => s.id === otherId);
+                if (!otherSubj) return "";
+                let cls = "afinidad";
+                if (e.type === "APROBADA") cls = "aprobada";
+                else if (e.type === "REGULAR") cls = "regular";
+                else if (e.type === "TRAYECTO") cls = "trayecto";
+                else if (e.type === "POSGRADO") cls = "posgrado";
+
+                return `<div class="rel-chip ${cls}" onclick="focusNode('${otherSubj.id}')" title="${e.topic || e.label}">
+                            <span><strong>[${otherSubj.id}]</strong> ${otherSubj.fullName}</span>
+                            <span class="rel-tag">${e.label}</span>
+                        </div>`;
+            };
+
+            const incomingHTML = incoming.length === 0
+                ? `<div style="font-size:0.78rem; color:var(--text-muted);">Nodo de inicio / Sin requisitos previos directos.</div>`
+                : incoming.map(e => mapEdgeChip(e, 'IN')).join("");
+
+            const outgoingHTML = outgoing.length === 0
+                ? `<div style="font-size:0.78rem; color:var(--text-muted);">Hito terminal de titulación o certificación.</div>`
+                : outgoing.map(e => mapEdgeChip(e, 'OUT')).join("");
+
+            let extraHeaderInfo = "";
+            if (subj.nodeType === "TRAYECTO") {
+                extraHeaderInfo = `
+                    <div class="roles-box">
+                        <strong>📜 Certificado Oficial:</strong> ${subj.certificateName}<br>
+                        <strong>⏱ Horizonte:</strong> ${subj.horizon}<br>
+                        <strong>💼 Roles Ocupacionales (NICE / ENISA ECSF):</strong> ${subj.roles}
+                    </div>
+                `;
+            } else if (subj.curricularBlock) {
+                extraHeaderInfo = `
+                    <div class="roles-box" style="background:rgba(56,189,248,0.08); border-color:rgba(56,189,248,0.3); color:#bae6fd;">
+                        <strong>📌 Ubicación en la Arquitectura Curricular:</strong><br>${subj.curricularBlock}
+                        ${subj.roles ? `<br><br><strong>🎯 Opciones / Alcance:</strong> ${subj.roles}` : ""}
+                    </div>
+                `;
+            }
+
+            const locationLabel = subj.nodeType === "TRAYECTO"
+                ? subj.horizon
+                : (subj.year <= 4 ? `${subj.year}° AÑO / ${subj.term}° CUATR. (GRADO)` : `AÑO ${subj.year - 4} / ${subj.term}° CUATR. (POSGRADO)`);
+
+            const creditUnit = subj.year > 4 ? "CRE" : "Cr. SACAU";
+
+            const inspector = document.getElementById("inspector-content");
+            inspector.innerHTML = `
+                <div class="node-header">
+                    <span class="node-badge" style="background:${cMeta.bg}; color:${cMeta.color}; border:1px solid ${cMeta.color};">
+                        ${cMeta.name}
+                    </span>
+                    <h2>${subj.fullName}</h2>
+                    <div class="node-meta">
+                        <span>CÓDIGO: <strong>${subj.id}</strong></span>
+                        <span>•</span>
+                        <span>${locationLabel}</span>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-val">${subj.credits}</div>
+                        <div class="metric-lbl">${creditUnit}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-val">${subj.total}h</div>
+                        <div class="metric-lbl">Carga Total</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-val">${subj.hip}h</div>
+                        <div class="metric-lbl">Presencial</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-val">${subj.hta}h</div>
+                        <div class="metric-lbl">Autónomo</div>
+                    </div>
+                </div>
+
+                ${extraHeaderInfo}
+
+                <div>
+                    <div class="section-title">Contenidos Mínimos / Alcance Formativo</div>
+                    <div class="content-box">${subj.contents}</div>
+                </div>
+
+                <div>
+                    <div class="section-title">Requisitos y Articulaciones Previas (${incoming.length})</div>
+                    <div class="rel-list">${incomingHTML}</div>
+                </div>
+
+                <div>
+                    <div class="section-title">Habilita / Conecta Hacia (${outgoing.length})</div>
+                    <div class="rel-list">${outgoingHTML}</div>
+                </div>
+            `;
+        }
+
+        function renderOverviewInspector() {
+            const cypherEl = document.getElementById("cypher-display");
+            cypherEl.innerHTML = `<span class="kw">MATCH</span> (n:<span class="lbl">Grado|Trayecto|Posgrado</span>)-[r]-&gt;(m) <span class="kw">RETURN</span> n, r, m;`;
+
+            const inspector = document.getElementById("inspector-content");
+            inspector.innerHTML = `
+                <div class="node-header">
+                    <span class="node-badge" style="background:rgba(56,189,248,0.18); color:#38bdf8; border:1px solid #38bdf8;">
+                        Arquitectura Curricular Integral UNSO
+                    </span>
+                    <h2>Ecosistema de Ciberseguridad, Trayectos y Posgrados</h2>
+                    <div class="node-meta">
+                        <span>61 NODOS INTEGRADOS</span>
+                        <span>•</span>
+                        <span>GRADO + T1–T5 + 2 MAESTRÍAS</span>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-val">28</div>
+                        <div class="metric-lbl">Mat. Grado</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-val">5</div>
+                        <div class="metric-lbl">Trayectos</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-val">14</div>
+                        <div class="metric-lbl">Maestría IA</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-val">14</div>
+                        <div class="metric-lbl">Maestría OSINT</div>
+                    </div>
+                </div>
+
+                <div class="director-note">
+                    <strong>🧭 Guía de Navegación del Ecosistema:</strong><br><br>
+                    • <strong>Círculos:</strong> Asignaturas de la Tecnicatura (1°–3°) y Licenciatura en Ciberseguridad (4°).<br>
+                    • <strong>Hexágonos (T1–T5):</strong> Certificaciones intermedias de aptitud laboral.<br>
+                    • <strong>Rombos (MIA):</strong> Maestría en IA e Inteligencia de Procesos (120 CRE).<br>
+                    • <strong>Triángulos / Estrellas (MOS):</strong> Especialización (60 CRE) y Maestría en OSINT (120 CRE).<br><br>
+                    Tocá cualquier nodo para auditar su carga horaria, créditos, contenidos mínimos y red de correlatividades.
+                </div>
+
+                <div>
+                    <div class="section-title">Accesos Rápidos a Hitos Clave</div>
+                    <div class="rel-list">
+                        <div class="rel-chip trayecto" onclick="focusNode('T1')">
+                            <span><strong>[T1]</strong> Trayecto Sistemas Seguros (Mes 18)</span>
+                            <span class="rel-tag">40 Cr.</span>
+                        </div>
+                        <div class="rel-chip trayecto" onclick="focusNode('T5')">
+                            <span><strong>[T5]</strong> Trayecto Ofensiva, CSIRT y CTI (Mes 48)</span>
+                            <span class="rel-tag">28 Cr.</span>
+                        </div>
+                        <div class="rel-chip posgrado" onclick="focusNode('MIA-14')">
+                            <span><strong>[MIA-14]</strong> Trabajo Final Maestría en IA</span>
+                            <span class="rel-tag">120 CRE</span>
+                        </div>
+                        <div class="rel-chip posgrado" onclick="focusNode('MOS-08')">
+                            <span><strong>[MOS-08]</strong> Título Intermedio: Especialista OSINT</span>
+                            <span class="rel-tag">60 CRE</span>
+                        </div>
+                        <div class="rel-chip posgrado" onclick="focusNode('MOS-14')">
+                            <span><strong>[MOS-14]</strong> Trabajo Final Maestría en OSINT</span>
+                            <span class="rel-tag">120 CRE</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================================================================
+        // 7. FILTRADO POR CARRERA, TRAYECTO, CLÚSTER Y BÚSQUEDA
+        // ============================================================================
+        function matchesCycleFilter(s, cycleVal) {
+            if (cycleVal === "ALL") return true;
+            if (cycleVal === "GRADO_TRAY") return s.nodeType === "GRADO" || s.nodeType === "TRAYECTO";
+            if (cycleVal === "GRADO_ONLY") return s.nodeType === "GRADO";
+            if (cycleVal === "TEC") return s.nodeType === "GRADO" && s.degree === "TEC";
+            if (cycleVal === "LIC_NUCLEO") return s.nodeType === "GRADO" && s.degree === "LIC";
+            if (cycleVal === "TRAY_ALL") return s.nodeType === "TRAYECTO" || (s.nodeType === "GRADO" && s.trayecto && s.trayecto.startsWith("T"));
+            if (cycleVal === "T1_VIEW") return s.id === "T1" || s.trayecto === "T1";
+            if (cycleVal === "T2_VIEW") return s.id === "T2" || s.trayecto === "T2";
+            if (cycleVal === "T3_VIEW") return s.id === "T3" || s.trayecto === "T3";
+            if (cycleVal === "T4_VIEW") return s.id === "T4" || s.trayecto === "T4" || s.trayectoArticulado === "T4";
+            if (cycleVal === "T5_VIEW") return s.id === "T5" || s.trayecto === "T5" || s.trayectoArticulado === "T5";
+            if (cycleVal === "POSGRADO_ALL") return s.nodeType === "POSGRADO_IA" || s.nodeType === "POSGRADO_OSINT";
+            if (cycleVal === "MIA_VIEW") return s.nodeType === "POSGRADO_IA";
+            if (cycleVal === "MOS_VIEW") return s.nodeType === "POSGRADO_OSINT";
+            if (cycleVal === "ESP_OSINT_VIEW") return s.nodeType === "POSGRADO_OSINT" && s.degree === "ESP_OSINT";
+            return true;
+        }
+
+        function filterNodes() {
+            const query = document.getElementById("search-input").value.toLowerCase().trim();
+            const cycleVal = document.getElementById("cycle-filter").value;
+
+            const updates = rawSubjects.map(s => {
+                const matchCycle = matchesCycleFilter(s, cycleVal);
+                const matchCluster = activeClusterFilter === "ALL" || s.cluster === activeClusterFilter;
+                const matchSearch = !query ||
+                    s.id.toLowerCase().includes(query) ||
+                    s.fullName.toLowerCase().includes(query) ||
+                    s.contents.toLowerCase().includes(query) ||
+                    (s.roles && s.roles.toLowerCase().includes(query));
+
+                return {
+                    id: s.id,
+                    hidden: !(matchCycle && matchCluster && matchSearch)
+                };
+            });
+
+            nodesDataset.update(updates);
+            updateEdgesVisibility();
+            updateStats();
+        }
+
+        function setClusterFilter(clusterKey) {
+            activeClusterFilter = clusterKey;
+            filterNodes();
+            if (isMobileViewport()) {
+                closeAllDrawers(true);
+            }
+        }
+
+        function updateEdgesVisibility() {
+            const showAprobada = document.getElementById("chk-aprobada").checked;
+            const showRegular = document.getElementById("chk-regular").checked;
+            const showTrayecto = document.getElementById("chk-trayecto").checked;
+            const showPosgrado = document.getElementById("chk-posgrado").checked;
+            const showAfinidad = document.getElementById("chk-afinidad").checked;
+
+            const visibleNodeIds = new Set(
+                nodesDataset.get().filter(n => !n.hidden).map(n => n.id)
+            );
+
+            const edgeUpdates = edgesDataset.get().map(e => {
+                let typeAllowed = true;
+                if (e.type === "APROBADA") typeAllowed = showAprobada;
+                else if (e.type === "REGULAR") typeAllowed = showRegular;
+                else if (e.type === "TRAYECTO") typeAllowed = showTrayecto;
+                else if (e.type === "POSGRADO") typeAllowed = showPosgrado;
+                else if (e.type === "AFINIDAD") typeAllowed = showAfinidad;
+
+                const endpointsVisible = visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to);
+                return {
+                    id: e.id,
+                    hidden: !(typeAllowed && endpointsVisible)
+                };
+            });
+
+            edgesDataset.update(edgeUpdates);
+            updateStats();
+        }
+
+        function setLayout(layoutType) {
+            currentLayout = layoutType;
+            document.getElementById("btn-force").classList.toggle("active", layoutType === "force");
+            document.getElementById("btn-hier").classList.toggle("active", layoutType === "hierarchical");
+            network.setOptions(getNetworkOptions(layoutType));
+            setTimeout(() => resetCamera(), 350);
+        }
+
+        function focusNode(nodeId) {
+            const node = nodesDataset.get(nodeId);
+            if (!node) return;
+            if (node.hidden) {
+                document.getElementById("cycle-filter").value = "ALL";
+                document.getElementById("search-input").value = "";
+                activeClusterFilter = "ALL";
+                filterNodes();
+            }
+            selectSubjectNode(nodeId);
+            network.focus(nodeId, {
+                scale: 1.05,
+                animation: { duration: 500, easingFunction: "easeInOutQuad" }
+            });
+            if (isMobileViewport()) {
+                openDrawer('right');
+            }
+        }
+
+        function resetCamera() {
+            if (network) {
+                network.fit({ animation: { duration: 500, easingFunction: "easeInOutQuad" } });
+            }
+        }
+
+        function clearSelection() {
+            if (network) {
+                network.unselectAll();
+            }
+            renderOverviewInspector();
+        }
+
+        function updateStats() {
+            const visibleNodes = nodesDataset.get().filter(n => !n.hidden);
+            const visibleEdges = edgesDataset.get().filter(e => !e.hidden);
+
+            const visibleSubjects = rawSubjects.filter(s => visibleNodes.some(vn => vn.id === s.id));
+            const totalCredits = visibleSubjects
+                .filter(s => s.nodeType !== "TRAYECTO")
+                .reduce((acc, s) => acc + s.credits, 0);
+            const totalHours = visibleSubjects
+                .filter(s => s.nodeType !== "TRAYECTO")
+                .reduce((acc, s) => acc + s.total, 0);
+
+            document.getElementById("stat-nodes").textContent = visibleNodes.length;
+            document.getElementById("stat-edges").textContent = visibleEdges.length;
+            document.getElementById("stat-hours").textContent = `${totalCredits} Cr. (${totalHours.toLocaleString("es-AR")} hs)`;
+        }
+
+        window.addEventListener("DOMContentLoaded", initGraph);
+    </script>
+</body>
+</html>
